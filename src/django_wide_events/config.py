@@ -1,0 +1,50 @@
+from django.conf import settings as django_settings
+from django.utils.module_loading import import_string
+from django.core.signals import setting_changed
+from .collectors import DEFAULT_COLLECTORS
+
+IMPORT_STRINGS = {"COLLECTORS"}          # values are dotted paths -> import them
+NESTED = {"SAMPLING", "STATIC_FIELDS"}   # merge one level deep instead of replacing
+
+DEFAULTS = {
+    "COLLECTORS": DEFAULT_COLLECTORS,
+    "STATIC_FIELDS": {},
+    "STRICT_COLLECTORS": False,
+    "LOGGER_NAME": "wide_events.request",
+    "NO_LOGGING_PATHS": [],
+    "SAMPLING": {"BASE_RATE": 1, "SLOW_MS": 1000, "KEEP_RULES": []},
+}
+
+class WideEventSettings:
+
+    def __init__(self):
+        self._cache = {}
+
+    def __getattr__(self, key):
+        if key not in DEFAULTS:
+            raise AttributeError(f"Invalid WIDE_EVENTS setting: {key!r}")
+        if key in self._cache:
+            return self._cache[key]
+
+        user = getattr(django_settings, "WIDE_EVENTS", {})
+        default = DEFAULTS[key]
+
+        if key not in user:
+            value = default
+        elif key in NESTED:
+            value = {**default, **user[key]}
+        else:
+            value = user[key]
+
+        if key in IMPORT_STRINGS:
+            value = [import_string(p) for p in value]
+
+        self._cache[key] = value
+        return value
+
+    def reload(self, **kwargs):
+        if kwargs.get("setting") == "WIDE_EVENTS":
+            self._cache.clear()
+
+wide_event_settings = WideEventSettings()
+setting_changed.connect(wide_event_settings.reload)
