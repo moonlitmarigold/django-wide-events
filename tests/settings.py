@@ -2,7 +2,7 @@
 
 Small on purpose: enough of a real Django to route a request through middleware,
 resolve a view, hit the session/auth machinery and emit a log record. No app of our
-own is installed beyond ``django_wide_events`` itself.
+own is installed beyond ``wide_events`` itself.
 """
 
 SECRET_KEY = "not-a-secret-this-is-a-test-project"
@@ -13,11 +13,11 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
-    "django_wide_events",
+    "wide_events",
 ]
 
 MIDDLEWARE = [
-    # NOTE: "django_wide_events.middleware.WideEventMiddleware" goes here, first,
+    # NOTE: "wide_events.middleware.WideEventMiddleware" goes here, first,
     # once it exists. Until then the harness proves everything around it works.
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",

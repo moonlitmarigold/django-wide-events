@@ -1,6 +1,6 @@
 """Behavioural tests for the core middleware.
 
-Skipped wholesale until ``django_wide_events.middleware`` exists — they activate on
+Skipped wholesale until ``wide_events.middleware`` exists — they activate on
 their own the moment it does, which makes them the spec to build against.
 """
 
@@ -8,11 +8,11 @@ import pytest
 from django.urls import reverse
 
 pytest.importorskip(
-    "django_wide_events.middleware",
+    "wide_events.middleware",
     reason="core middleware not implemented yet (see EXAMPLE_USAGE.md)",
 )
 
-MIDDLEWARE_PATH = "django_wide_events.middleware.WideEventMiddleware"
+MIDDLEWARE_PATH = "wide_events.middleware.WideEventMiddleware"
 
 
 @pytest.fixture(autouse=True)

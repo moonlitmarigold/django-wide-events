@@ -1,7 +1,7 @@
 from contextvars import ContextVar, Token
 import dataclasses
 
-_current: ContextVar[dict | None] = ContextVar("django_wide_events.event", default=None)
+_current: ContextVar[dict | None] = ContextVar("wide_events.event", default=None)
 
 @dataclasses.dataclass
 class ContextEvent:

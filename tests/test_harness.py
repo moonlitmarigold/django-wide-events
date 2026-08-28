@@ -14,7 +14,7 @@ LOGGER = logging.getLogger("wide_events")
 
 
 def test_django_boots():
-    assert "django_wide_events" in settings.INSTALLED_APPS
+    assert "wide_events" in settings.INSTALLED_APPS
     assert settings.WIDE_EVENTS["STATIC_FIELDS"]["service"] == "test-project"
 
 
