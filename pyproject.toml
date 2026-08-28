@@ -1,17 +1,40 @@
 [project]
 name = "django-wide-events"
 version = "0.1.0"
-description = "Add your description here"
+description = "One wide event per Django request: canonical log lines built from pluggable collectors and blocks."
 readme = "README.md"
+requires-python = ">=3.10"
 authors = [
     { name = "moonlitmarigold", email = "moonlitmarigold12@gmail.com" }
 ]
-requires-python = ">=3.13"
-dependencies = []
+classifiers = [
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "contextvars>=2.4",
+    "django>=4.2",
+    "django-appconf>=1.2.0",
+]
 
-[project.scripts]
-django-wide-events = "django_wide_events:main"
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-django>=4.8",
+]
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = "src"
+module-name = "django_wide_events"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"
