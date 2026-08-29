@@ -78,6 +78,80 @@ classDiagram
     context --o "0..1 per execution context" dict : the event
 ```
 
+## Running outside a request
+
+The core is stdlib-only and works in any Python process. Requests are just the
+most common unit of work, not the only one — Celery tasks, management commands
+and scripts get the same one-event-per-unit treatment through the same
+ContextVar, formatter and filter.
+
+**The layering rule:** nothing outside the adapter layer imports Django.
+
+```mermaid
+flowchart TB
+    subgraph core["core — stdlib only"]
+        ctx["context.py<br/>ContextVar, event, wide_event()"]
+        fmt["formatters/<br/>logging.Formatter"]
+        flt["filters/<br/>logging.Filter"]
+    end
+    subgraph adapters["adapters — import their framework"]
+        mw["middleware.py<br/>source='request'"]
+        cel["contrib/celery.py<br/>source='task'"]
+        cmd["management commands<br/>source='command'"]
+    end
+    mw --> ctx
+    cel --> ctx
+    cmd --> ctx
+    ctx --> fmt
+    ctx --> flt
+```
+
+Each adapter does exactly three things: open a context, seed the fields only it
+can know, emit once in a `finally`. Everything between is identical.
+
+```mermaid
+sequenceDiagram
+    participant A as Adapter (middleware / celery / command)
+    participant CV as ContextVar
+    participant W as work (view, task body, handle())
+    participant L as logging
+
+    A->>CV: ContextEvent.init(source=..., request_id=...)
+    A->>W: run
+    W->>CV: event.set(...)
+    W-->>A: done or raise
+    A->>CV: drop()
+    Note over A,CV: finally
+    A->>L: one record, extra={"event": ...}
+```
+
+### Celery
+
+`contrib/celery.py` wires four signals, so no task needs decorating:
+
+| signal | does |
+| --- | --- |
+| `before_task_publish` | stamps the **caller's** trace_id/request_id onto the message headers |
+| `task_prerun` | opens the context, seeds task name, task_id, retries, and the inherited trace |
+| `task_failure` | records `error.type` / `error.message` |
+| `task_postrun` | drops the context and emits exactly one event |
+
+The publish/prerun pair is what makes a task correlatable back to the request
+that queued it: `trace_id` survives the hop, `parent_request_id` names the
+request, and the task's own `task_id` becomes its `request_id`. One query on
+`trace_id` returns the request and every task it spawned.
+
+### Anything else
+
+```python
+from django_wide_events.context import wide_event, event
+
+with wide_event("command", name="backfill_thumbnails"):
+    event.set(processed=n)
+```
+
+Emits on the way out, records the exception and re-raises if the block fails.
+
 # Step 1 - Event Core
 
 **Goal:** an event exists per request, code anywhere can write to it, and writing
@@ -160,15 +234,28 @@ Four properties that matter for us:
 
 # Step 2 - Formatter
 
-1. Add working app-config and read settings
-2. base collector and custom collector logic
-3. Write Json Formatter (+ Indent)
-4. Add static fields
+## Time?
+How should the time be set? time needs to be configureable with django and not
+propose: extra time file
+
+## Formatter split
+Formatters will be spilt. if_indent will be set at top-level
 
 # Step 3 - Middleware
 
-1. Add settings
-2. Build pluggable Middleware
+## Configure settings
+- how read the settings from the file?
+- How to split into django and non-django
+## Build Middleware
+
+- build all collectors and stuff at init/variables
+- each run:
+  - skips logging for certain paths
+  - adds static fields
+  - runs collectors
+  - feeds context to event
+  - sets the error of the request / decides if logging info or error
+  - set the request id // if not trusted by the header
 
 # Step 4 - Filter
 
