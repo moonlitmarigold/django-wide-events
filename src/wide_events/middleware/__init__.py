@@ -1,0 +1,1 @@
+from .wide_event_middleware import WideEventMiddleware
