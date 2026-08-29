@@ -95,7 +95,8 @@ class WideEventMiddleware:
         event['request_id'] = incoming
 
     @staticmethod
-    def apply_response_id(response, request_id, ):
-        response.headers[]
+    def apply_response_id(response, request_id, header: str | None):
+        if header:
+            response.headers[header] = request_id
 
 
