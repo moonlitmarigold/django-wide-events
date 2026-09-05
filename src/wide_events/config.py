@@ -4,7 +4,7 @@ from django.core.signals import setting_changed
 from .collectors import DEFAULT_COLLECTORS
 
 IMPORT_STRINGS = {"COLLECTORS"}          # values are dotted paths -> import them
-NESTED = {"SAMPLING", "STATIC_FIELDS"}   # merge one level deep instead of replacing
+NESTED = {"SAMPLING", "STATIC_FIELDS", "REQUEST_ID"}   # merge one level deep instead of replacing
 
 DEFAULTS = {
     "COLLECTORS": DEFAULT_COLLECTORS,

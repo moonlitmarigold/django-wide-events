@@ -3,16 +3,34 @@ from ..collectors import Collector
 from ..context import ContextEvent
 import time
 from typing import Callable
+import logging
 
 
-def _overrides(cls, name):
-    return getattr(cls, name) is not getattr(Collector, name)
-
-def get_request_id(request):
-    request.headers.get("X-Request-Id", "")
+def get_request_id(request, generation_func:Callable):
+    _id = request.headers.get("X-Request-Id", "")
+    if _id:
+        return _id
+    return generation_func()
 
 def generate_request_id(generation_func:Callable):
     return generation_func()
+
+
+def apply_request_id(request, event, generation_func:Callable):
+    incoming = generation_func(request)
+    request.request_id = incoming
+    event['request_id'] = incoming
+
+def apply_response_id(request, response, header: str):
+    response.headers[header] = request.request_id
+
+def apply_status_code(response, event):
+    event['status_code'] = int(getattr(response, 'status_code', 200))
+
+def apply_route(request, event):
+    match = getattr(request, "resolver_match", None)
+    if match:
+        event["route"] = match.view_name
 
 class WideEventMiddleware:
 
@@ -24,19 +42,44 @@ class WideEventMiddleware:
         self.get_response = get_response
 
         self.pre_hooks = [] # request, event, collectors
-        self.finished_hooks = []
+        self.finished_hooks = [] # request, response, event, collectors
         self.exception_hooks = []
 
 
         self.Collectors = wide_event_settings.COLLECTORS
         self.StaticFields = wide_event_settings.STATIC_FIELDS
 
+        # Use lambda r(request), e(event), c(collectors) to build the hooks at every point at the init of middleware
         request_id_settings = wide_event_settings.REQUEST_ID
         if request_id_settings.get('TRUST_ID_HEADER'):
-            self.pre_hooks.append(lambda r:get_request_id(r))
+            self.pre_hooks.append(lambda r, e, c:
+                                  apply_request_id(
+                                      r, e, lambda r2:
+                                      get_request_id(r2, request_id_settings.get('ID_GENERATOR'))
+                                  )
+                            )
         else:
-            self.pre_hooks.append(lambda r: generate_request_id(request_id_settings.get('ID_GENERATOR')))
+            self.pre_hooks.append(lambda r, e, c:
+                                  apply_request_id(
+                                      r, e, generate_request_id(request_id_settings.get('ID_GENERATOR'))
+                                  )
+                            )
 
+        response_header = request_id_settings.get('RESPONSE_HEADER', None)
+        if response_header:
+            self.finished_hooks.append(lambda rq, rp, e, c: apply_response_id(rq, rp, response_header))
+
+        self.pre_hooks.append(lambda r, e, c: e.update(self.StaticFields))
+
+        # At last, add the collectors to the hooks
+        self.pre_hooks.extend(self.plan('on_create'))
+        self.exception_hooks.extend(self.plan('on_exception'))
+
+        # Plan hooks
+        self.finished_hooks.extend(self.plan_finish('on_finish'))
+        self.finished_hooks.extend([lambda rq, rp, e, c: apply_route(rq, e), lambda rq, rp, e, c: apply_status_code(rp, e)])
+
+        self.logger = logging.getLogger(wide_event_settings.LOGGER_NAME)
 
 
     def __call__(self, request):
@@ -49,23 +92,39 @@ class WideEventMiddleware:
         event:dict = {}
         ctx = ContextEvent.init()
         _collectors = self.return_collectors()
-        self.apply_request_id(request, event, self._request_id_generation)
 
+        response = None
         try:
-            event.update(self.StaticFields)
-
-            self.collector_on_create(_collectors, request, event)
+            for hook in self.pre_hooks:
+                hook(request, event, _collectors)
 
             response = self.get_response(request)
 
             return response
         except Exception:
-            self.collector_on_exception(_collectors, request, event)
+            for hook in self.exception_hooks:
+                hook(request, event, _collectors)
+
+            # Add error info
+            raise
         finally:
-            event['duration_ms'] = round((time.perf_counter() - start) * 1000, 2)
-            self.collector_on_finish(_collectors, request, response, event)
+            if response is not None:
+                for hook in self.finished_hooks:
+                    hook(request, response, event, _collectors)
 
             event.update(ctx.drop())
+
+            event['duration_ms'] = round((time.perf_counter() - start) * 1000, 2)
+
+            # Also: set the error/type of logging
+            self._log(request, event)
+
+
+    def _log(self, request, event):
+        if 'status_code' not in event.keys() or event['status_code'] >= 500:
+            self.logger.error("request", extra={"event": event})
+        else:
+            self.logger.info("request", extra={"event": event})
 
 
     def no_logging(self, request):
@@ -74,29 +133,24 @@ class WideEventMiddleware:
     def return_collectors(self):
         return [c() for c in self.Collectors]
 
-    @staticmethod
-    def _call_collectors(collectors, func_name, *args):
-        for c in collectors:
-            c(func_name, *args)
+    def plan(self, name):
+        base = getattr(Collector, name)
+        def step(i, fn):
+            return lambda r, e, c: fn(c[i], r, e)
+        return [
+            step(i, getattr(cls, name))
+            for i, cls in enumerate(self.Collectors)
+            if getattr(cls, name) is not base
+        ]
 
-    def collector_on_create(self, collectors, request, event):
-        self._call_collectors(collectors, 'on_create', request, event)
-
-    def collector_on_finish(self, collectors, request, response, event):
-        self._call_collectors(collectors, 'on_finish', request, response, event)
-
-    def collector_on_exception(self, collectors, request, event):
-        self._call_collectors(collectors, 'on_exception', request, event)
-
-    @staticmethod
-    def apply_request_id(request, event, generation_func:Callable):
-        incoming = generation_func(request)
-        request.request_id = incoming
-        event['request_id'] = incoming
-
-    @staticmethod
-    def apply_response_id(response, request_id, header: str | None):
-        if header:
-            response.headers[header] = request_id
+    def plan_finish(self, name):
+        base = getattr(Collector, name)
+        def step(i, fn):
+            return lambda rq, rp, e, c: fn(c[i], rq, rp, e)
+        return [
+            step(i, getattr(cls, name))
+            for i, cls in enumerate(self.Collectors)
+            if getattr(cls, name) is not base
+        ]
 
 
