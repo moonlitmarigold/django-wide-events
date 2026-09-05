@@ -38,3 +38,14 @@ DJANGO_SETTINGS_MODULE = "tests.settings"
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-ra"
+
+# Capture everything; shown automatically in the "captured log" section of failures.
+log_level = "DEBUG"
+log_format = "%(levelname)-8s %(name)s: %(message)s"
+log_date_format = "%H:%M:%S"
+
+# Live logs on: without this, logs print only for FAILING tests.
+# Quiet a run with:  -o log_cli=false
+log_cli = true
+log_cli_level = "DEBUG"
+log_cli_format = "%(levelname)-8s %(name)s: %(message)s"
