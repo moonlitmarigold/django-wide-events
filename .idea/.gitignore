@@ -3,3 +3,9 @@
 /workspace.xml
 # Editor-based HTTP Client requests
 /httpRequests/
+# Project-specific files
+*.iml
+/misc.xml
+/vcs.xml
+/material_theme_project_new.xml
+/inspectionProfiles/
