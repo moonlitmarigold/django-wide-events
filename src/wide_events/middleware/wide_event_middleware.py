@@ -1,9 +1,10 @@
 from ..config import wide_event_settings
-from ..collectors import Collector
+from ..collectors import Collector, CollectorHooks
 from ..context import ContextEvent
 import time
 from typing import Callable
 import logging
+import traceback
 
 
 def get_request_id(request, generation_func:Callable):
@@ -25,7 +26,7 @@ def apply_response_id(request, response, header: str):
     response.headers[header] = request.request_id
 
 def apply_status_code(response, event):
-    event['status_code'] = int(getattr(response, 'status_code', 200))
+    event['status_code'] = int(getattr(response, 'status_code'))
 
 def apply_route(request, event):
     match = getattr(request, "resolver_match", None)
@@ -43,7 +44,7 @@ class WideEventMiddleware:
 
         self.pre_hooks = [] # request, event, collectors
         self.finished_hooks = [] # request, response, event, collectors
-        self.exception_hooks = []
+        self.exception_hooks = [] # request, exception, event, collectors
 
 
         self.Collectors = wide_event_settings.COLLECTORS
@@ -72,12 +73,12 @@ class WideEventMiddleware:
         self.pre_hooks.append(lambda r, e, c: e.update(self.StaticFields))
 
         # At last, add the collectors to the hooks
-        self.pre_hooks.extend(self.plan('on_create'))
-        self.exception_hooks.extend(self.plan('on_exception'))
+        self.pre_hooks.extend(self.plan_hooks('on_create'))
+        self.exception_hooks.extend(self.plan_hooks('on_exception'))
 
         # Plan hooks
-        self.finished_hooks.extend(self.plan_finish('on_finish'))
-        self.finished_hooks.extend([lambda rq, rp, e, c: apply_route(rq, e), lambda rq, rp, e, c: apply_status_code(rp, e)])
+        self.finished_hooks.extend(self.plan_hooks('on_finish'))
+        self.finished_hooks.extend([lambda rq, rp, e, c: apply_status_code(rp, e)])
 
         self.logger = logging.getLogger(wide_event_settings.LOGGER_NAME)
 
@@ -92,26 +93,27 @@ class WideEventMiddleware:
         event:dict = {}
         ctx = ContextEvent.init()
         _collectors = self.return_collectors()
+        request.collectors = _collectors
 
         response = None
         try:
             for hook in self.pre_hooks:
                 hook(request, event, _collectors)
 
+            request.event = event
             response = self.get_response(request)
 
             return response
-        except Exception:
-            for hook in self.exception_hooks:
-                hook(request, event, _collectors)
-
-            # Add error info
-            raise
         finally:
+
             if response is not None:
                 for hook in self.finished_hooks:
                     hook(request, response, event, _collectors)
+            else:
+                event['status_code'] = 500
 
+            event = getattr(request, 'event', event)
+            apply_route(request,event) # use it unconditionally
             event.update(ctx.drop())
 
             event['duration_ms'] = round((time.perf_counter() - start) * 1000, 2)
@@ -133,24 +135,50 @@ class WideEventMiddleware:
     def return_collectors(self):
         return [c() for c in self.Collectors]
 
-    def plan(self, name):
-        base = getattr(Collector, name)
-        def step(i, fn):
+
+    def plan_hooks(self, name):
+
+        def pre_hook_factory(i, fn):
             return lambda r, e, c: fn(c[i], r, e)
-        return [
-            step(i, getattr(cls, name))
-            for i, cls in enumerate(self.Collectors)
-            if getattr(cls, name) is not base
-        ]
 
-    def plan_finish(self, name):
-        base = getattr(Collector, name)
-        def step(i, fn):
+        def exception_hook_factory(i, fn):
+            return lambda r, ex, e, c: fn(c[i], r, ex, e)
+
+        def finish_hook_factory(i, fn):
             return lambda rq, rp, e, c: fn(c[i], rq, rp, e)
+
+        if name == CollectorHooks.on_create.value:
+            factory = pre_hook_factory
+        elif name == CollectorHooks.on_exception.value:
+            factory = exception_hook_factory
+        else:
+            factory = finish_hook_factory
+
+        base = getattr(Collector, name)
+
         return [
-            step(i, getattr(cls, name))
+            factory(i, getattr(cls, name))
             for i, cls in enumerate(self.Collectors)
             if getattr(cls, name) is not base
         ]
 
+    def process_exception(self, request, exception):
+        request.event["error"] = ({
+            "type": type(exception).__name__,
+            "message": str(exception),
+            "stack":
+                "".join(traceback.format_exception(type(exception), exception,
+                exception.__traceback__))
+            }
+        )
+
+        for hook in self.exception_hooks:
+            hook(
+                request,
+                exception,
+                request.event,
+                request.collectors
+            )
+
+        return None
 
