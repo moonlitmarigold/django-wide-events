@@ -3,6 +3,11 @@ from uuid import uuid4
 SECRET_KEY = "tests"
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
+ROOT_URLCONF = "tests.urls"
+
+MIDDLEWARE = [
+    "wide_events.middleware.wide_event_middleware.WideEventMiddleware",
+]
 
 INSTALLED_APPS = [
     "django.contrib.auth",

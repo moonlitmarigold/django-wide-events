@@ -1,26 +1,14 @@
 import logging
-from urllib import response
 from uuid import uuid4
 
-from django.http import HttpResponse, Http404
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 
 from wide_events.config import wide_event_settings
-from wide_events.middleware.wide_event_middleware import WideEventMiddleware
 
 
 def _make_request_id() -> str:
     return uuid4().hex
 
-
-def dummy_view(request):
-    return HttpResponse("ok")
-
-def dummy_error_view(request):
-    return HttpResponse(status=523)
-
-def dummy_404_view(request):
-    raise Http404
 
 class RecordingHandler(logging.Handler):
     def __init__(self):
@@ -43,7 +31,9 @@ class RecordingHandler(logging.Handler):
 )
 class TestWideEventMiddleware(TestCase):
     def setUp(self):
-        self.factory = RequestFactory()
+        # raise_request_exception=False so an unhandled view exception is reported
+        # as a 500 instead of being re-raised into the test.
+        self.client = Client(raise_request_exception=False)
         self.handler = RecordingHandler()
         self.logger = logging.getLogger(wide_event_settings.LOGGER_NAME)
         self.logger.addHandler(self.handler)
@@ -52,33 +42,49 @@ class TestWideEventMiddleware(TestCase):
     def tearDown(self):
         self.logger.removeHandler(self.handler)
 
-    def request_through(self, x_request_id=None, view=None):
-        kwargs = {}
-        _view = view if view else dummy_view
-        if x_request_id is not None:
-            kwargs["HTTP_X_REQUEST_ID"] = x_request_id
-        request = self.factory.get("/", **kwargs)
-        response = WideEventMiddleware(_view)(request)
-        return request, response
+    @property
+    def event(self):
+        return self.handler.records[-1].event
 
     def test_emits_single_event_with_trusted_request_id(self):
-        _, _ = self.request_through(x_request_id="test-rid-123")
+        self.client.get("/", headers={"x-request-id": "test-rid-123"})
 
         assert len(self.handler.records) == 1
-        event = self.handler.records[0].event
-        assert event["request_id"] == "test-rid-123"
-        assert event["static_fields"]["service"] if "static_fields" in event else True
+        assert self.event["request_id"] == "test-rid-123"
+        assert self.event["service"] == "tests"
 
     def test_generates_request_id_when_header_absent(self):
-        request, _ = self.request_through()
-        event = self.handler.records[-1].event
-        assert event["request_id"] == request.request_id
+        self.client.get("/")
+        assert self.event["request_id"]
 
     def test_sets_request_id_response_header(self):
-        _, response = self.request_through(x_request_id="test-rid-123")
+        response = self.client.get("/", headers={"x-request-id": "test-rid-123"})
         assert response["X-Request-Id"] == "test-rid-123"
 
-    def test_request_error(self):
-        _, response = self.request_through(view=dummy_404_view)
+    def test_records_route_and_status(self):
+        self.client.get("/")
+        assert self.event["route"] == "ok"
+        assert self.event["status_code"] == 200
+        assert self.handler.records[-1].levelno == logging.INFO
 
-        _, response = self.request_through(view=dummy_error_view)
+    def test_http404_is_not_an_error_level_event(self):
+        self.client.get("/404/")
+        assert self.event["status_code"] == 404
+        assert self.handler.records[-1].levelno == logging.INFO
+        assert self.event["error"]["type"] == "Http404"
+
+    def test_5xx_response_without_exception_logs_at_error(self):
+        self.client.get("/523/")
+        assert self.event["status_code"] == 523
+        assert self.handler.records[-1].levelno == logging.ERROR
+        assert "error" not in self.event
+
+    def test_view_exception_records_error_and_status_500(self):
+        self.client.get("/boom/")
+        assert self.event["status_code"] == 500
+        assert self.event["route"] == "boom"
+        assert self.handler.records[-1].levelno == logging.ERROR
+        error = self.event["error"]
+        assert error["type"] == "ValueError"
+        assert error["message"] == "boom"
+        assert "raise ValueError" in error["stack"]
