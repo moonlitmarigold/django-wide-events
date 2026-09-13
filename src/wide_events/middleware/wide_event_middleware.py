@@ -79,8 +79,8 @@ class WideEventMiddleware:
         self.exception_hooks.extend(self.plan_hooks('on_exception'))
 
         # Plan hooks
-        self.finished_hooks.extend(self.plan_hooks('on_finish'))
         self.finished_hooks.extend([lambda rq, rp, e, c: apply_status_code(rp, e)])
+        self.finished_hooks.extend(self.plan_hooks('on_finish'))
 
         self.logger = logging.getLogger(wide_event_settings.LOGGER_NAME)
 
@@ -100,7 +100,7 @@ class WideEventMiddleware:
         response = None
         try:
             for hook in self.pre_hooks:
-                hook(request, event, _collectors)
+                self.run_hook(hook, event, *(request, event, _collectors))
 
             request.event = event
             response = self.get_response(request)
@@ -108,13 +108,15 @@ class WideEventMiddleware:
             return response
         finally:
 
+            event = getattr(request, 'event', event)
             if response is not None:
                 for hook in self.finished_hooks:
-                    hook(request, response, event, _collectors)
+
+                    self.run_hook(hook, event, *(request, response, event, _collectors))
             else:
                 event['status_code'] = 500
 
-            event = getattr(request, 'event', event)
+
             apply_route(request,event) # use it unconditionally
             event.update(ctx.drop())
 
@@ -161,11 +163,14 @@ class WideEventMiddleware:
 
         base = getattr(Collector, name)
 
-        return [
-            factory(i, getattr(cls, name))
-            for i, cls in enumerate(self.Collectors)
-            if getattr(cls, name) is not base
-        ]
+        hooks = []
+        for i, cls in enumerate(self.Collectors):
+            if getattr(cls, name) is not base:
+                hook = factory(i, getattr(cls, name))
+                hook.label = f"{cls.__name__}.{name}"
+                hooks.append(hook)
+
+        return hooks
 
     def process_exception(self, request, exception):
         request.event["error"] = ({
@@ -178,12 +183,32 @@ class WideEventMiddleware:
         )
 
         for hook in self.exception_hooks:
-            hook(
-                request,
-                exception,
-                request.event,
-                request.collectors
-            )
+            self.run_hook(hook, request.event, *(request, exception, request.event, request.collectors))
 
         return None
+
+    @staticmethod
+    def process_view(request, view_func, view_args, view_kwargs):
+        view = getattr(view_func, "view_class", view_func)  # CBVs
+        if getattr(view, "capture", True) is False:
+            request.event["_capture"] = False
+        return None
+
+    def run_hook(self, hook:Callable, event, *args):
+        try:
+            hook(*args)
+        except Exception as e:
+            self._record_hook_failure(getattr(hook, "label", repr(hook)), event, e)
+
+    @staticmethod
+    def _record_hook_failure(label, event, exception):
+        errors = event.setdefault('hook_errors', [])
+        errors.append(
+            {
+                "hook" : label,
+                "stack": "".join(traceback.format_exception(type(exception), exception,
+                exception.__traceback__))
+            }
+        )
+
 
