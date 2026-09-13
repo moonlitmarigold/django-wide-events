@@ -296,7 +296,7 @@ Shipped but **not** in the defaults, name them to switch them on:
 
 ## 6. Logging config — yours to write
 
-The package ships `JSONFormatter`, `IndentJSONFormatter`, `HeadSampling` and
+The package ships `JSONFormatter`, `IndentJSONFormatter`, `RandomSampling` and
 `TailSampling`. It does **not** ship a `LOGGING` builder; you wire it exactly like your
 example project does today, including the dev-indent switch:
 
@@ -341,7 +341,7 @@ so tuning rates never means editing the `LOGGING` dict.
 
 Two filters, two separate concerns, both plain `logging.Filter`:
 
-- **`HeadSampling`** — outcome-independent. Deterministic hash of `request_id` at a flat
+- **`RandomSampling`** — outcome-independent. Deterministic hash of `request_id` at a flat
   rate. Cheap, unbiased, good for firehose endpoints.
 - **`TailSampling`** — outcome-aware. Keep rules first (errors, slow, writes, security),
   deterministic hash sampling for whatever is left. Needs `duration_ms` and

@@ -257,10 +257,19 @@ Formatters will be spilt. if_indent will be set at top-level
   - sets the error of the request / decides if logging info or error
   - set the request id // if not trusted by the header
 
+## Collectors
+
+- Add Static Fields
+- Add the base range of Collectors
+
+### Test No logging Paths // increased performance 
+
+- 
+
 # Step 4 - Filter
 
 1. Incooperate settings
-2. Write simple headsampling filter
+2. Write simple randomsampling filter
 3. Write Tailsampling filter
 4. Add keep Rules
 
