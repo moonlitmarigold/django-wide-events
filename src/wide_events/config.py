@@ -3,13 +3,12 @@ from django.utils.module_loading import import_string
 from django.core.signals import setting_changed
 from .collectors import DEFAULT_COLLECTORS
 
-IMPORT_STRINGS = {"COLLECTORS"}          # values are dotted paths -> import them
+IMPORT_STRINGS = {"COLLECTORS", "ID_GENERATOR"}          # values are dotted paths -> import them
 NESTED = {"SAMPLING", "STATIC_FIELDS", "REQUEST_ID"}   # merge one level deep instead of replacing
 
 DEFAULTS = {
     "COLLECTORS": DEFAULT_COLLECTORS,
     "STATIC_FIELDS": {},
-    "STRICT_COLLECTORS": False,
     "LOGGER_NAME": "wide_events.request",
     "NO_LOGGING_PATHS": [],
     "REQUEST_ID": {

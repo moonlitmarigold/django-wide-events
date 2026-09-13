@@ -49,6 +49,7 @@ class WideEventMiddleware:
 
         self.Collectors = wide_event_settings.COLLECTORS
         self.StaticFields = wide_event_settings.STATIC_FIELDS
+        self.NoLogging = wide_event_settings.NO_LOGGING_PATHS
 
         # Use lambda r(request), e(event), c(collectors) to build the hooks at every point at the init of middleware
         request_id_settings = wide_event_settings.REQUEST_ID
@@ -62,7 +63,8 @@ class WideEventMiddleware:
         else:
             self.pre_hooks.append(lambda r, e, c:
                                   apply_request_id(
-                                      r, e, generate_request_id(request_id_settings.get('ID_GENERATOR'))
+                                      r, e, lambda r2:
+                                            request_id_settings.get('ID_GENERATOR')()
                                   )
                             )
 
@@ -130,6 +132,9 @@ class WideEventMiddleware:
 
 
     def no_logging(self, request):
+        for route in self.NoLogging:
+            if request.path.startswith(route):
+                return True
         return False
 
     def return_collectors(self):
