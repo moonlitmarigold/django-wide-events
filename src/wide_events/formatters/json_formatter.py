@@ -15,7 +15,10 @@ class JSONFORMATTER(logging.Formatter):
 
         event = self.return_event(record)
 
-        event.update(getattr(record, 'event', {}))
+        request_event = getattr(record, 'event', {})
+        if "_capture" in request_event.keys():
+            del request_event["_capture"]
+        event.update(request_event)
 
         if record.exc_info:
             event['error'] = self.return_error(record)

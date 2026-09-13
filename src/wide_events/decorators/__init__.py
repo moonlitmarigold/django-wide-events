@@ -1,0 +1,1 @@
+from .capture import never_capture
