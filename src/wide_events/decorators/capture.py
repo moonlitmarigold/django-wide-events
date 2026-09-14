@@ -1,7 +1,9 @@
 
 
-def never_capture():
-    def mark(v):
-        setattr(v, "capture", False)
-        return v
-    return mark
+def never_capture(v):
+    setattr(v, "capture", False)
+    return v
+
+def always_capture(v):
+    setattr(v, "capture", True)
+    return v

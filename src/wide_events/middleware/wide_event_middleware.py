@@ -190,8 +190,9 @@ class WideEventMiddleware:
     @staticmethod
     def process_view(request, view_func, view_args, view_kwargs):
         view = getattr(view_func, "view_class", view_func)  # CBVs
-        if getattr(view, "capture", True) is False:
-            request.event["_capture"] = False
+        is_capture = getattr(view, "capture", None)
+        if is_capture is not None:
+            request.event["_capture"] = is_capture
         return None
 
     def run_hook(self, hook:Callable, event, *args):

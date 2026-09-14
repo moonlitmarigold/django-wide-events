@@ -9,7 +9,7 @@ exceptions into responses, and ``resolver_match`` is populated so
 from django.http import Http404, HttpResponse
 from django.urls import path
 import time
-from wide_events.decorators import never_capture
+from wide_events.decorators import never_capture, always_capture
 
 def ok_view(request):
     return HttpResponse("ok")
@@ -37,8 +37,12 @@ def slow_view(request):
     time.sleep(0.05)
     return HttpResponse("ok")
 
-@never_capture()
+@never_capture
 def never_view(request):
+    return HttpResponse("ok")
+
+@always_capture
+def always_view(request):
     return HttpResponse("ok")
 
 from event_block_view import test_event_block
@@ -51,6 +55,8 @@ urlpatterns = [
     path("boom/", boom_view, name="boom"),
     path("slow/", slow_view, name="slow"),
     path("403/", forbidden_view, name="forbidden"),
+    path("never/", never_view, name="never_view"),
+    path("always/", always_view, name="always_view"),
     path("event_block/", test_event_block, name="test_event_block"),
 
 ]

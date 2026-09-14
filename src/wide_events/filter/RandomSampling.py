@@ -20,9 +20,9 @@ class RandomSampling(logging.Filter):
                 return True
             return False
 
-        if_capture = event.get("_capture", False)
-        if if_capture:
-            return True
+        if_capture = event.get("_capture", None)
+        if if_capture is not None:
+            return if_capture
 
         res = self._filter(record, event)
         if not res: # if filter returns None, then normal sample, if not just return true

@@ -1,1 +1,1 @@
-from .capture import never_capture
+from .capture import never_capture, always_capture
