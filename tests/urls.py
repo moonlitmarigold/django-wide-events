@@ -41,6 +41,9 @@ def slow_view(request):
 def never_view(request):
     return HttpResponse("ok")
 
+from event_block_view import test_event_block
+
+
 urlpatterns = [
     path("", ok_view, name="ok"),
     path("523/", status_523_view, name="status-523"),
@@ -48,4 +51,6 @@ urlpatterns = [
     path("boom/", boom_view, name="boom"),
     path("slow/", slow_view, name="slow"),
     path("403/", forbidden_view, name="forbidden"),
+    path("event_block/", test_event_block, name="test_event_block"),
+
 ]
