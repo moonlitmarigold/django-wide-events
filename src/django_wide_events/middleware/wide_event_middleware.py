@@ -5,6 +5,7 @@ import time
 from typing import Callable
 import logging
 import traceback
+from ..event_blocks import HookErrorEvent, ExceptionEvent
 
 
 def get_request_id(request, generation_func:Callable):
@@ -119,7 +120,7 @@ class WideEventMiddleware:
 
 
             apply_route(request,event) # use it unconditionally
-            event.update(ctx.drop())
+            event = ContextEvent.merge(event, ctx.drop(), drop_none=True)
             # Reset Blocks
             block_ctx.drop()
 
@@ -176,13 +177,10 @@ class WideEventMiddleware:
         return hooks
 
     def process_exception(self, request, exception):
-        request.event["error"] = ({
-            "type": type(exception).__name__,
-            "message": str(exception),
-            "stack":
-                "".join(traceback.format_exception(type(exception), exception,
-                exception.__traceback__))
-            }
+        ExceptionEvent.save_error(
+            type(exception).__name__,
+            str(exception),
+            "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
         )
 
         for hook in self.exception_hooks:
@@ -206,13 +204,9 @@ class WideEventMiddleware:
 
     @staticmethod
     def _record_hook_failure(label, event, exception):
-        errors = event.setdefault('hook_errors', [])
-        errors.append(
-            {
-                "hook" : label,
-                "stack": "".join(traceback.format_exception(type(exception), exception,
-                exception.__traceback__))
-            }
+        HookErrorEvent.save_hook_error(
+            label,
+            "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
         )
 
 
