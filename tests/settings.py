@@ -6,7 +6,7 @@ ALLOWED_HOSTS = ["*"]
 ROOT_URLCONF = "tests.urls"
 
 MIDDLEWARE = [
-    "wide_events.middleware.wide_event_middleware.WideEventMiddleware",
+    "django_wide_events.middleware.wide_event_middleware.WideEventMiddleware",
 ]
 
 INSTALLED_APPS = [

@@ -14,7 +14,7 @@ DEFAULTS = {
     "REQUEST_ID": {
         "TRUST_ID_HEADER": True, # TRUE: Always trust False: Never
         "RESPONSE_HEADER": "X-Request-Id",
-        "ID_GENERATOR": "wide_events.ids.uuid4.hex",
+        "ID_GENERATOR": "django_wide_events.ids.uuid4.hex",
     }
     # "SAMPLING": {"BASE_RATE": 1, "SLOW_MS": 1000, "KEEP_RULES": []}, Sampling on the filter
 }

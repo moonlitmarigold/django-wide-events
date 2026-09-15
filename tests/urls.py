@@ -9,7 +9,7 @@ exceptions into responses, and ``resolver_match`` is populated so
 from django.http import Http404, HttpResponse
 from django.urls import path
 import time
-from wide_events.decorators import never_capture, always_capture
+from django_wide_events.decorators import never_capture, always_capture
 
 def ok_view(request):
     return HttpResponse("ok")

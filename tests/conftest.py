@@ -5,7 +5,7 @@ import logging.config
 import pytest
 from django.conf import settings
 
-from wide_events.config import wide_event_settings
+from django_wide_events.config import wide_event_settings
 
 
 class _RenderEvent(logging.Filter):

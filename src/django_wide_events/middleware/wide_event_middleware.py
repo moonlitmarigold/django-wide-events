@@ -1,6 +1,6 @@
 from ..config import wide_event_settings
 from ..collectors import Collector, CollectorHooks
-from ..context import ContextEvent
+from ..context import ContextEvent, ContextBlock
 import time
 from typing import Callable
 import logging
@@ -94,6 +94,7 @@ class WideEventMiddleware:
 
         event:dict = {}
         ctx = ContextEvent.init()
+        block_ctx = ContextBlock.init()
         _collectors = self.return_collectors()
         request.collectors = _collectors
 
@@ -119,6 +120,8 @@ class WideEventMiddleware:
 
             apply_route(request,event) # use it unconditionally
             event.update(ctx.drop())
+            # Reset Blocks
+            block_ctx.drop()
 
             event['duration_ms'] = round((time.perf_counter() - start) * 1000, 2)
 

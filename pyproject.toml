@@ -1,5 +1,5 @@
 [project]
-name = "wide-events"
+name = "django-wide-events"
 version = "0.1.0"
 description = "One wide event per Django request: canonical log lines built from pluggable collectors and blocks."
 readme = "README.md"
@@ -31,7 +31,7 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-root = "src"
-module-name = "wide_events"
+module-name = "django_wide_events"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tests.settings"

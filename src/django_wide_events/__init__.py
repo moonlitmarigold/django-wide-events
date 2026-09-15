@@ -1,5 +1,5 @@
 def main() -> None:
-    print("Hello from wide-events!")
+    print("Hello from django-wide-events!")
 
 from . import context
 from . import config

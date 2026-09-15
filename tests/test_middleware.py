@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from django.test import Client, TestCase, override_settings
 
-from wide_events.config import wide_event_settings
+from django_wide_events.config import wide_event_settings
 
 
 def _make_request_id() -> str:

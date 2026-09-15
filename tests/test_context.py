@@ -1,4 +1,4 @@
-from wide_events.context import ContextEvent
+from django_wide_events.context import ContextEvent
 
 
 def test_uninitialized_get_returns_empty_mapping():

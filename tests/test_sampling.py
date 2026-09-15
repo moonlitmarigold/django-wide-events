@@ -4,8 +4,8 @@ from django.test import TestCase, override_settings
 from tests.test_middleware import EventCaptureMixin
 from unittest.mock import patch
 
-from wide_events.filter import RandomSampling
-from wide_events.filter.rules import (
+from django_wide_events.filter import RandomSampling
+from django_wide_events.filter.rules import (
     DEFAULT_RULES,
     BaseRule,
     ErrorRequest,
@@ -21,7 +21,7 @@ def sample_logging(base_rate=100):
     "disable_existing_loggers": False,
     "filters": {
         "random_sampler": {
-            "()": "wide_events.filter.RandomSampling",
+            "()": "django_wide_events.filter.RandomSampling",
             "base_rate": base_rate,
         }
     },
@@ -56,7 +56,7 @@ def tail_logging(base_rate=100, slow_ms=10):
     "disable_existing_loggers": False,
     "filters": {
         "tail_sampler": {
-            "()": "wide_events.filter.TailSampling",
+            "()": "django_wide_events.filter.TailSampling",
             "base_rate": base_rate,
             "keep_rules": [SlowRequest(slow_ms=slow_ms)],
         }
@@ -170,7 +170,7 @@ def default_rules_logging(base_rate=100):
     "disable_existing_loggers": False,
     "filters": {
         "tail_sampler": {
-            "()": "wide_events.filter.TailSampling",
+            "()": "django_wide_events.filter.TailSampling",
             "base_rate": base_rate,
         }
     },
@@ -186,7 +186,7 @@ def default_rules_logging(base_rate=100):
     LOGGING=default_rules_logging(),
     # WriteRequest reads meta.method, which only exists if MetaData is
     # installed - the base test settings run with COLLECTORS = [].
-    WIDE_EVENTS={"COLLECTORS": ["wide_events.collectors.MetaData"]},
+    WIDE_EVENTS={"COLLECTORS": ["django_wide_events.collectors.MetaData"]},
 )
 @patch.object(RandomSampling, "sample_on_base_rate", return_value=False)
 class TestDefaultRules(EventCaptureMixin, TestCase):

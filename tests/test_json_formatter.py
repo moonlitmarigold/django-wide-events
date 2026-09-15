@@ -1,7 +1,7 @@
 import json
 import logging
 
-from wide_events.formatters.json_formatter import JSONFORMATTER
+from django_wide_events.formatters.json_formatter import JSONFORMATTER
 
 
 def _make_record(message="hello", name="wide_events.test"):
