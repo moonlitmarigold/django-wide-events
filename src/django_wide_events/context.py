@@ -57,20 +57,29 @@ class ContextEvent(BaseContext):
         ctx.update(kwargs)
 
     @staticmethod
-    def update(payload:dict, drop_none:bool=True):
+    def update(payload:dict, drop_none:bool=True, append_lists:bool=False):
         ctx = ContextEvent.get()
-        return ContextEvent.merge(ctx, payload, drop_none)
+        return ContextEvent.merge(ctx, payload, drop_none, append_lists)
 
     @staticmethod
-    def merge(ctx:dict, payload:dict, drop_none:bool=True):
+    def merge(ctx:dict, payload:dict, drop_none:bool=True, append_lists:bool=False):
         # payload is positional on purpose: taking it as **kwargs let a field named
         # 'ctx' raise TypeError and a field named 'drop_none' silently vanish.
         for key, value in payload.items():
             if isinstance(value, dict):
-                ContextEvent.merge(ctx.setdefault(key, {}), value, drop_none)
+                ContextEvent.merge(ctx.setdefault(key, {}), value, drop_none, append_lists)
             else:
                 if drop_none and value is None:
                     continue
+                if append_lists and isinstance(value, list):
+                    attached = ctx.get(key)
+                    # Only list-on-list accumulates. A list landing on a scalar writes as
+                    # usual -- merging there would lose the scalar silently. On nothing it
+                    # writes a copy, so the caller keeps their list free of later appends.
+                    if isinstance(attached, list):
+                        attached.extend(value)
+                        continue
+                    value = list(value)
                 ctx[key] = value
         return ctx
 

@@ -13,6 +13,7 @@ class EventBlock:
     multiple: ClassVar[bool] = False
     drop_none:ClassVar[bool] = True
     use_namespace_on_write:ClassVar[bool] = True
+    append_list:ClassVar[bool] = False
 
     abstract: ClassVar[bool] = True
 
@@ -77,9 +78,9 @@ class EventBlock:
 
     def set(self, **kwargs):
         if self.use_namespace_on_write:
-            ContextEvent.merge(self.get(), kwargs, self.drop_none)
+            ContextEvent.merge(self.get(), kwargs, self.drop_none, self.append_list)
         else:
-            ContextEvent.update(kwargs, self.drop_none)
+            ContextEvent.update(kwargs, self.drop_none, self.append_list)
         return self
 
     def _attach(self):
