@@ -1,8 +1,13 @@
 from ..config import wide_event_settings
-from ..collectors import Collector, CollectorHooks, Bultin
+from ..collectors import Collector, CollectorHooks
+from ..collectors.builtin import (
+    BUILTIN_COLLECTORS,
+    FACTORY_COLLECTORS,
+    Change,
+    ChangeHookPosition,
+    Duration,
+)
 from ..context import ContextEvent, ContextBlock, ContextCollectors, ContextCapture
-import time
-from typing import Type
 import logging
 import traceback
 from ..event_blocks import HookErrorEvent, ExceptionEvent
@@ -39,13 +44,13 @@ class CtxDict:
 class WideEventMiddleware:
 
     Collectors:list[Collector]
-    HookPositionChanges:list[dict[str, Type|list]] = [
+    HookPositionChanges: list[dict[str, type | list[Change]]] = [
         {
-            "cls":Bultin.Duration,
-            "changes":[
-                Bultin.Change(CollectorHooks.on_create.value, 0),
-                Bultin.Change(CollectorHooks.on_finish.value, -1),
-                Bultin.Change(CollectorHooks.on_finish_no_response.value, -1),
+            "cls": Duration,
+            "changes": [
+                Change(CollectorHooks.on_create.value, 0),
+                Change(CollectorHooks.on_finish.value, -1),
+                Change(CollectorHooks.on_finish_no_response.value, -1),
             ]
         }
     ]
@@ -60,11 +65,11 @@ class WideEventMiddleware:
 
         # Build the collectors Step by Step
 
-        # Step 1: Bultin Collectors
-        self.collectors_classes = list(Bultin.BUILTIN_COLLECTORS)
+        # Step 1: Builtin Collectors
+        self.collectors_classes = list(BUILTIN_COLLECTORS)
 
         # Step 2: Factory Collectors
-        self.collectors_classes += [factory_collector() for factory_collector in Bultin.FACTORY_COLLECTORS]
+        self.collectors_classes += [factory() for factory in FACTORY_COLLECTORS]
 
         # Step 3: Other Collectors
         self.collectors_classes += self.Collectors
@@ -84,7 +89,7 @@ class WideEventMiddleware:
             _changes = change.get("changes")
             if not _changes:
                 continue
-            Bultin.ChangeHookPosition(
+            ChangeHookPosition(
                 _cls, self.collectors_classes, self.hooks, _changes
             ).convert()
 
