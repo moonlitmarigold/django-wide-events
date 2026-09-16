@@ -2,11 +2,12 @@ from ..config import wide_event_settings
 from ..collectors import Collector, CollectorHooks, Bultin
 from ..context import ContextEvent, ContextBlock, ContextCollectors, ContextCapture
 import time
-from typing import Callable
+from typing import Type
 import logging
 import traceback
 from ..event_blocks import HookErrorEvent, ExceptionEvent
 from dataclasses import dataclass
+
 
 @dataclass
 class CtxDict:
@@ -38,6 +39,17 @@ class CtxDict:
 class WideEventMiddleware:
 
     Collectors:list[Collector]
+    HookPositionChanges:list[dict[str, Type|list]] = [
+        {
+            "cls":Bultin.Duration,
+            "changes":[
+                Bultin.Change(CollectorHooks.on_create.value, 0),
+                Bultin.Change(CollectorHooks.on_finish.value, -1),
+                Bultin.Change(CollectorHooks.on_finish_no_response.value, -1),
+            ]
+        }
+    ]
+
 
 
     def __init__(self, get_response):
@@ -49,7 +61,7 @@ class WideEventMiddleware:
         # Build the collectors Step by Step
 
         # Step 1: Bultin Collectors
-        self.collectors_classes = Bultin.BUILTIN_COLLECTORS
+        self.collectors_classes = list(Bultin.BUILTIN_COLLECTORS)
 
         # Step 2: Factory Collectors
         self.collectors_classes += [factory_collector() for factory_collector in Bultin.FACTORY_COLLECTORS]
@@ -65,22 +77,16 @@ class WideEventMiddleware:
             ] for hook_phase in CollectorHooks
         }
 
-        # Modify the collectors Index to have Duration at the first position in create and on the last at finish
-        index_of_duration_in_collectors:int|None = self.get_index_class_in_collectors(Bultin.Duration, self.collectors_classes)
-        if index_of_duration_in_collectors is not None:
-
-            # change creation hooks
-            self.hooks[CollectorHooks.on_create.value] = self.change_position_of_hook(
-                index_of_duration_in_collectors, self.hooks[CollectorHooks.on_create.value], False
-            )
-
-            self.hooks[CollectorHooks.on_finish.value] = self.change_position_of_hook(
-                index_of_duration_in_collectors, self.hooks[CollectorHooks.on_finish.value], False
-            )
-
-            self.hooks[CollectorHooks.on_finish_no_response.value] = self.change_position_of_hook(
-                index_of_duration_in_collectors, self.hooks[CollectorHooks.on_finish_no_response.value], False
-            )
+        for change in self.HookPositionChanges:
+            _cls = change.get("cls", None)
+            if not _cls:
+                continue
+            _changes = change.get("changes")
+            if not _changes:
+                continue
+            Bultin.ChangeHookPosition(
+                _cls, self.collectors_classes, self.hooks, _changes
+            ).convert()
 
         self.logger = logging.getLogger(wide_event_settings.LOGGER_NAME)
 
@@ -92,24 +98,6 @@ class WideEventMiddleware:
         # Factory entries are resolved to the class of the collector they build.
         collector_cls = cls if isinstance(cls, type) else type(cls())
         return getattr(collector_cls, phase)
-
-    @staticmethod
-    def get_index_class_in_collectors(_cls, collectors):
-        for i, hook in enumerate(collectors):
-            # entries are classes or factory instances; only classes can match
-            if isinstance(hook, type) and issubclass(hook, _cls):
-                return i
-        return None
-
-    @staticmethod
-    def change_position_of_hook(collector_index:int, target_index:int, hook_phase:list[int]):
-        if collector_index == target_index:
-            return hook_phase
-
-        del hook_phase[hook_phase.index(collector_index)]
-        pre = hook_phase[:target_index]
-        after = hook_phase[target_index:]
-        return [*pre, collector_index, *after]
 
 
     def __call__(self, request):
