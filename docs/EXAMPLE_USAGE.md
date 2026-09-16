@@ -577,6 +577,13 @@ extend. These are designed-for, not built:
   the view. No `.emit()`.
 - No `request.event`. The ContextVar proxy plus `get_event()` / `Block.current()` is the
   single way in.
+- The ContextVar is the **source of truth** for the event — middleware, collectors and
+  `process_exception` read and write it there, never via `request`. This covers sync,
+  ASGI (`sync_to_async` / `asyncio.to_thread` copy the context) and off-request work
+  (Celery, management commands). **It does not cover manual threads:**
+  `threading.Thread(...)` and a bare `ThreadPoolExecutor.submit(...)` start with an
+  empty context, so writes there are silently dropped. Such code has to run inside
+  `contextvars.copy_context().run(...)`.
 - Logger `wide_events.request`, message `"request"` — fixed for v1.
 - Naming: the control family is `@capture` / `@always_capture` / `@never_capture`
   (+ `CaptureMixin`); the data one is `@capture_block` (+ `CaptureBlockMixin`).
