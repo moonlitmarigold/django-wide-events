@@ -4,6 +4,8 @@ from typing import ClassVar
 
 _current: ContextVar[dict | None] = ContextVar("django_wide_events.event", default=None)
 _blocks: ContextVar[dict | None] = ContextVar("django_wide_events.block", default=None)
+_collectors: ContextVar[list | None] = ContextVar("django_wide_events.collectors", default=None)
+_capture:ContextVar[bool | None] = ContextVar("django_wide_events.capture", default=None)
 
 
 class BlockAlreadyAttached(Exception):
@@ -113,3 +115,53 @@ class ContextBlock(BaseContext):
             raise BlockAlreadyAttached(key, attached, block)
         ctx[key] = block
         return block
+
+@dataclasses.dataclass
+class ContextCollectors:
+
+    token: Token | None = None
+
+    @classmethod
+    def init(cls):
+        _cls = cls()
+        _cls.token = _collectors.set([])
+        return _cls
+
+    @staticmethod
+    def get():
+        ctx = _collectors.get()
+        if ctx is None:
+            return []
+        return ctx
+
+    @staticmethod
+    def set_collectors(collectors:list):
+        ContextCollectors.get().extend(collectors)
+
+
+    def drop(self):
+        if not self.token:
+            return
+        _ctx = self.get()
+        _collectors.reset(self.token)
+        return _ctx
+
+@dataclasses.dataclass
+class ContextCapture(BaseContext):
+
+    _contex_var = _capture
+
+    @staticmethod
+    def set(var:bool):
+        _capture.set(var)
+
+    @staticmethod
+    def get():
+        return _capture.get()
+
+    @classmethod
+    def init(cls):
+        _cls = cls()
+        ctx_var = _cls.check_or_raise_contex_var()
+        _cls.token = ctx_var.set(None)
+        return _cls

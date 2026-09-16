@@ -4,13 +4,13 @@ from django.utils import timezone
 
 class MetaData(Collector):
 
-    def on_create(self, request, event):
+    def on_create(self, request):
 
         meta = {
             "method": request.method,
             "timezone": timezone.get_current_timezone_name(),
             "timestamp" : datetime.now(_timezone.utc).isoformat(timespec='milliseconds'),
         }
-        event["meta"] = meta
+        self.set(meta=meta)
 
 

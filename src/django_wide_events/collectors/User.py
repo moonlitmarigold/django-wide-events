@@ -2,7 +2,7 @@ from .Base import Collector
 
 class User(Collector):
 
-    def on_create(self, request, event):
+    def on_create(self, request):
 
         event_user = {}
 
@@ -15,5 +15,5 @@ class User(Collector):
             event_user["is_anonymous"] = request.user.is_anonymous
 
         if event_user:
-            event["user"] = event_user
+            self.set(user=event_user)
 
