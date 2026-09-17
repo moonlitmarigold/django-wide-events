@@ -5,6 +5,7 @@ from ..collectors.builtin import (
     FACTORY_COLLECTORS,
     Change,
     ChangeHookPosition,
+    HookPosition,
     Duration,
 )
 from ..context import ContextEvent, ContextBlock, ContextCollectors, ContextCapture
@@ -44,16 +45,13 @@ class CtxDict:
 class WideEventMiddleware:
 
     Collectors:list[Collector]
-    HookPositionChanges: list[dict[str, type | list[Change]]] = [
-        {
-            "cls": Duration,
-            "changes": [
-                Change(CollectorHooks.on_create.value, 0),
-                Change(CollectorHooks.on_finish.value, -1),
-                Change(CollectorHooks.on_finish_no_response.value, -1),
-            ]
-        }
-    ]
+    HookPositionChanges:tuple[HookPosition, ...] = (
+        HookPosition(Duration, (
+            Change(CollectorHooks.on_create, 0),
+            Change(CollectorHooks.on_finish, -1),
+            Change(CollectorHooks.on_finish_no_response, -1)
+        )),
+    )
 
 
 
@@ -83,15 +81,7 @@ class WideEventMiddleware:
         }
 
         for change in self.HookPositionChanges:
-            _cls = change.get("cls", None)
-            if not _cls:
-                continue
-            _changes = change.get("changes")
-            if not _changes:
-                continue
-            ChangeHookPosition(
-                _cls, self.collectors_classes, self.hooks, _changes
-            ).convert()
+            change.apply(self.collectors_classes, self.hooks)
 
         self.logger = logging.getLogger(wide_event_settings.LOGGER_NAME)
 

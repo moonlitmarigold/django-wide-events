@@ -1,27 +1,31 @@
 import dataclasses
 from typing import Callable
 
-from ..Base import Collector
+from ..Base import Collector, CollectorHooks
 
 CollectorEntry = type[Collector] | Callable[[], Collector | type[Collector]]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Change:
-    phase: str
+    _phase: CollectorHooks
     target_index: int
+
+    @property
+    def phase(self) -> str:
+        return self._phase.value
 
     def absolute(self, length: int) -> int:
         return self.target_index % length
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass()
 class ChangeHookPosition:
 
     cls: type[Collector]
     collectors: list[CollectorEntry]
     hooks: dict[str, list[int]]
-    changes: list[Change]
+    changes: tuple[Change, ...]
 
     @staticmethod
     def get_index_class_in_collectors(_cls, collectors):
@@ -55,3 +59,16 @@ class ChangeHookPosition:
             self.hooks[change.phase] = self.change_position_of_hook(
                 change, index
             )
+
+@dataclasses.dataclass(frozen=True)
+class HookPosition:
+
+    cls:type[Collector]
+    changes: tuple[Change, ...]
+
+    def apply(
+        self,
+        collectors: list[CollectorEntry],
+        hooks: dict[str, list[int]],
+    ) -> None:
+        ChangeHookPosition(self.cls, collectors, hooks, self.changes).convert()
