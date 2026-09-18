@@ -1,155 +1,405 @@
 # django-wide-events
 
-<!-- one-line pitch: what it does, in a sentence -->
-Implementation of Wide Events for Django
-AINOTE: Maybe spice up a bit
-https://loggingsucks.com/ (Reference for the project)
+One rich, structured log line per request, instead of a dozen scattered ones.
+
+`django-wide-events` brings the *wide event* (or *canonical log line*) pattern to Django. It is built on Django's own `logging`, so it drops into the `LOGGING` config you already have instead of replacing it. The pattern is described in detail at <https://loggingsucks.com/>.
 
 <!-- badges: PyPI version, Python versions, Django versions, license, CI -->
-AINOTE:You do
 
 ---
 
 ## Why wide events
 
-<!-- NOTES: the problem with scattered log lines. Keep to a short paragraph -- the -->
-<!-- argument itself lives at loggingsucks.com, link it rather than restate it. -->
-As explained in https://loggingsucks.com/
+Scattered log lines describe what the *code* did. A wide event describes what happened to the *request*. Instead of a dozen `logger.info(...)` calls spread over middleware, views and services, each request builds up one structured record as it runs and emits it once when it finishes.
 
-### Before / after
-
-<!-- NOTES: the N-scattered-log-lines vs. one-canonical-line contrast. Probably two -->
-<!-- short code blocks side by side. -->
+That record is meant to be wide: user context, route, status, timings and your own domain data all sit side by side. With many fields per event, your logs can be queried like an analytics table ("slow downloads by paid users, grouped by route") instead of grepped line by line. The full argument is at <https://loggingsucks.com/>.
 
 ### What one event looks like
 
-<!-- NOTES: a real emitted JSON line. This is the single most persuasive thing in the -->
-<!-- README -- decide how many fields to show (enough to look high-dimensional, few -->
-<!-- enough to read at a glance). -->
+```json
+{
+  "loglevel": "INFO",
+  "message": "request",
+  "logger": "wide_events.request",
+  "timestamp": 1789650000.123,
+  "service": "shop",
+  "env": "prod",
+  "request_id": "9f1c2e...",
+  "meta": {"method": "GET", "timezone": "UTC", "timestamp": "2026-09-17T10:00:00.000+00:00"},
+  "user": {"id": 42, "username": "ada", "is_authenticated": true, "is_staff": false},
+  "picture": {"id": "abc", "is_owner": true, "timers": {"s3_fetch_ms": 12.4}},
+  "route": "pictures:download",
+  "status_code": 200,
+  "duration_ms": 48.31,
+  "sample_rate": 10
+}
+```
 
-
+Framework fields (`route`, `status_code`, `duration_ms`, `user`) sit next to your own domain data (`picture`).
 
 ---
 
 ## Install
 
-<!-- NOTES: pip / uv line. Requirements: Python >=3.10, Django >=4.2. -->
+- `pip install django-wide-events` / `uv add django-wide-events`
+- Requires Python >= 3.10 and Django >= 4.2
 
 ## Quickstart
 
-<!-- NOTES: the smallest thing that produces one JSON line per request. -->
-<!-- INSTALLED_APPS + MIDDLEWARE placement (as early as possible, and why) + a minimal -->
-<!-- LOGGING dict. Decide: does the package ship a LOGGING helper, or is it hand-written? -->
-AINOTE: As in my tests for filters, the logging config should remain handwritten to ensure max customiability
+- Add the middleware to `MIDDLEWARE`, as early as possible, so the event covers (and times) the rest of the stack
+  - No `INSTALLED_APPS` entry needed
+
+  ```python
+  MIDDLEWARE = [
+      "django_wide_events.middleware.WideEventMiddleware",
+      # ... the rest of your middleware
+  ]
+  ```
+
+- Write the `LOGGING` config yourself; the package deliberately ships no helper, so you keep full control over handlers, formatters and filters
+  - Minimal setup: a formatter, a sampling filter and a stdout handler on the `wide_events.request` logger
+
+  ```python
+  LOGGING = {
+      "version": 1,
+      "disable_existing_loggers": False,
+      "formatters": {
+          "wide": {
+              "()": "django_wide_events.formatters.JSONFORMATTER",
+          },
+      },
+      "filters": {
+          "sampling": {
+              "()": "django_wide_events.filter.TailSampling",
+              "base_rate": 10,
+          },
+      },
+      "handlers": {
+          "stdout": {
+              "class": "logging.StreamHandler",
+              "formatter": "wide",
+              "filters": ["sampling"],
+          },
+      },
+      "loggers": {
+          "wide_events.request": {
+              "handlers": ["stdout"],
+              "level": "INFO",
+              "propagate": False,
+          },
+      },
+  }
+  ```
+
+- Result: one JSON line per request
+- For readable output during local development, indent it:
+
+  ```python
+  "formatters": {
+      "wide": {
+          "()": "django_wide_events.formatters.JSONFORMATTER",
+          "indent": True,
+      },
+  },
+  ```
+
+- The split of responsibilities:
+  - The middleware collects the data and emits the event once
+  - Formatters decide what the line looks like
+  - Filters decide whether it's kept
 
 ---
 
-## Writing to the event
+## Lifecycle of a log in this project
 
-<!-- NOTES: the ad-hoc path. The event lives in a ContextVar, not on `request`. -->
-<!-- Say why that matters: deep service code needs no plumbing. -->
-
-### The event API
-
-<!-- NOTES: set / update / timer / incr, and get_event() as the escape hatch. -->
-<!-- Note that writing outside an active event is a silent no-op. -->
+<!-- TODO (Alex): planned for later — request -> middleware -> collectors / blocks -> finally -> filter -> formatter -> handler -->
 
 ---
 
 ## Event blocks
 
-<!-- NOTES: the class-based path for domain data. Lead with when to reach for a block -->
-<!-- instead of the ad-hoc API. -->
+- Blocks are **the intended way to write to the event**
+- A block is a class with a `namespace`; everything it writes lands under that key in the event
+- Blocks are stateless: the class holds no data
+  - Every `set(...)` goes straight into the current request's event
+  - `Block.current()` finds the attached block again from anywhere in the request
+- The middleware writes everything the blocks collected to the log at the end of the request, including after an early return or an exception
+- There's nothing to emit or render yourself
 
-### Declaring a block
+### Example
 
-<!-- NOTES: namespace, named constructors, chainable enrichers. Blocks are loose -- -->
-<!-- no declared fields in v1. -->
+```python
+from django.http import HttpResponse
+from django_wide_events.event_blocks import EventBlock, TimerEventBlock
 
-### Attaching and retrieving
 
-<!-- NOTES: construction auto-attaches; no .emit() / .render() call. current() and the -->
-<!-- flush-in-finally guarantee (nothing lost on early return or exception). -->
+class PictureBlock(TimerEventBlock):
+    namespace = "picture"
 
-### Nested blocks
+    @classmethod
+    def download(cls, picture_id):
+        return cls.from_kwargs(action="download", id=picture_id)
 
-<!-- NOTES: parent / path, and the dotted registry key. Worth stating the rule that -->
-<!-- makes it work: '.' is banned inside a namespace, so paths stay unambiguous. -->
+    def owner(self, is_owner):
+        return self.set(is_owner=is_owner)
 
-### Attaching twice
 
-<!-- NOTES: multiple = True for list-valued blocks; BlockAlreadyAttached for the -->
-<!-- single case, and why that raises instead of merging silently. -->
+class StorageBlock(EventBlock):
+    namespace = "storage"
+    parent = PictureBlock                   # nests under event["picture"]
 
-### Timers
 
-<!-- NOTES: the context-manager timer, named and nestable. -->
+def download(request, picture_id):
+    PictureBlock.download(picture_id)       # attaches to this request's event
+    fetch_file(picture_id)
+    return HttpResponse("ok")
 
-### The capture decorator
 
-<!-- NOTES: @capture_block, pulling values from view kwargs; the CBV mixin. -->
+def fetch_file(picture_id):
+    block = PictureBlock.current()          # no request object needed
+    block.owner(True).set(caption=None)     # chainable; None is dropped
+    with block.timer("s3_fetch"):
+        ...
+    StorageBlock(kwargs={"bucket": "pictures"})
+```
+
+- Resulting event (only the block part shown):
+
+  ```json
+  {
+    "picture": {
+      "action": "download",
+      "id": "abc",
+      "is_owner": true,
+      "timers": {"s3_fetch_ms": 10.07},
+      "storage": {"bucket": "pictures"}
+    }
+  }
+  ```
+
+### Rules
+
+- `namespace` is required (or `abstract=True` for base classes), and can't contain `.`
+- `from_kwargs(...)` reuses the attached block; constructing the same block twice raises `BlockAlreadyAttached`
+- `multiple = True`: each instance is kept as a list entry; `current()` returns the latest
+- `parent = OtherBlock` nests the block; the parent can't be abstract or `multiple`
+- `TimerEventBlock.timer(name)` works as a context manager or via `start_timer()` / `stop_timer()`, and writes `timers.<name>_ms`
+- Class flags: `drop_none`, `append_list`, `use_namespace_on_write`
+- Advanced: the raw event API behind the blocks is described in [docs/INTERNALS.md](docs/INTERNALS.md)
 
 ---
 
 ## Collectors
 
-<!-- NOTES: framework-level fields, keyed to the event lifecycle rather than the -->
-<!-- request cycle (so commands and tasks work too). on_create / on_finish / -->
-<!-- on_exception. What ships by default. -->
+- Collectors add framework-level fields at fixed points in the event's lifecycle: `on_create`, `on_exception`, `on_finish`, `on_finish_no_response`
+- A collector only runs for the hooks it overrides
+- A collector that raises never breaks the request; the error is recorded under `hook_error.hook_errors`
+- Collectors are stateful: anything stored in `__init__` or `on_create` is still there for the later hooks
+- A fresh set of collectors is created at the start of every request
+- Built-in and default collectors: see [docs/INTERNALS.md](docs/INTERNALS.md#collectors-reference)
+
+### Example
+
+- Record which picture was requested, and whether it was served:
+
+  ```python
+  # myapp/collectors.py
+  from django_wide_events.collectors import Collector
+
+
+  class RequestedPicture(Collector):
+
+      def __init__(self):
+          self.picture_id = None
+
+      def on_create(self, request):
+          # resolver_match isn't set yet in on_create; read the raw path instead
+          parts = request.path.strip("/").split("/")
+          if len(parts) >= 2 and parts[0] == "pictures":
+              self.picture_id = parts[1]
+              self.set(picture={"id": self.picture_id})
+
+      def on_finish(self, request, response):
+          if self.picture_id is not None:
+              self.set(picture={"served": response.status_code == 200})
+
+      def on_exception(self, request, exception):
+          if self.picture_id is not None:
+              self.set(picture={"failed": True})
+  ```
+
+- Register it next to the defaults; setting `COLLECTORS` replaces the list, so keep `DEFAULT_COLLECTORS` in it:
+
+  ```python
+  # settings.py
+  from django_wide_events.collectors import DEFAULT_COLLECTORS
+
+  WIDE_EVENTS = {
+      "COLLECTORS": [
+          *DEFAULT_COLLECTORS,
+          "myapp.collectors.RequestedPicture",
+      ],
+  }
+  ```
 
 ## Static fields
 
-<!-- NOTES: STATIC_FIELDS -- service, env, commit, region. None values dropped. -->
+- `STATIC_FIELDS`: fixed fields written on every event, e.g. `service`, `env`, `commit`, `region`
+- `None` values are dropped
+
+  ```python
+  WIDE_EVENTS = {
+      "STATIC_FIELDS": {
+          "service": "shop",
+          "env": os.environ.get("ENV"),
+          "commit": os.environ.get("GIT_SHA"),
+      },
+  }
+  ```
 
 ## Sampling
 
-<!-- NOTES: tail sampling as a logging.Filter. Keep rules (errors, slow, writes, -->
-<!-- 401/403/429) vs. the base rate for fast successful reads. Deterministic on -->
-<!-- request_id, and sample_rate recorded on the event. -->
+- Sampling is a standard `logging.Filter`, so it's configured in `LOGGING`
+- `TailSampling` keeps every event that matches a rule, and 1 in `base_rate` of the rest:
+
+  ```python
+  "filters": {
+      "sampling": {
+          "()": "django_wide_events.filter.TailSampling",
+          "base_rate": 20,      # 1 = keep all, 0 = drop everything no rule keeps
+      },
+  },
+  ```
+
+- Default rules: errors, 5xx / no status, slow (>= 1000 ms), non-GET/HEAD, 401/403/429
+- The decision is deterministic per `request_id`
+- Events sampled at the base rate carry `sample_rate`, so counts can be scaled back up
+- Custom rules replace the defaults; keep `DEFAULT_RULES` in the list to extend them instead:
+
+  ```python
+  from django_wide_events.filter.rules import DEFAULT_RULES, BaseRule
+
+
+  class PaidUser(BaseRule):
+      def keep(self, record, event):
+          return self.lookup(event, "user.tier") == "paid"
+
+
+  "sampling": {
+      "()": "django_wide_events.filter.TailSampling",
+      "base_rate": 20,
+      "keep_rules": [*DEFAULT_RULES, PaidUser()],
+  },
+  ```
+
+- Built-in rules take options, e.g. `SlowRequest(slow_ms=500)`, when you list them yourself
+- `RandomSampling` takes the same arguments but has no rules
 
 ## Formatters
 
-<!-- NOTES: JSON, indented JSON for local dev, Google Cloud Logging. -->
+- `JSONFORMATTER` writes the event as one JSON line; any `exc_info` becomes `error.{type, stack}`
+- `GoogleFormatter` does the same, using a `severity` field for Google Cloud Logging
+- A common setup: indented output in dev, one line in prod:
+
+  ```python
+  "formatters": {
+      "wide": {
+          "()": "django_wide_events.formatters.JSONFORMATTER",
+          "indent": DEBUG,
+      },
+      "gcp": {
+          "()": "django_wide_events.formatters.GoogleFormatter",
+      },
+  },
+  ```
+
+---
 
 ## Per-view control
 
-<!-- NOTES: opt-in / opt-out decorators, NO_LOGGING_PATHS. -->
+- Decorators mark individual views; they never add data:
 
-## Session traceability
+  ```python
+  from django_wide_events.decorators import always_capture, never_capture
 
-<!-- NOTES: the second, optional middleware. This is a headline feature, not a -->
-<!-- footnote -- decide whether it deserves its own top-level section higher up. -->
+
+  @always_capture          # kept even when sampling would drop it
+  def checkout(request): ...
+
+
+  @never_capture           # dropped by the sampling filter
+  def poll(request): ...
+
+
+  class PictureDetail(DetailView):
+      capture = True       # the class-based form
+  ```
+
+  - The decorators take effect in the sampling filter, so they need `TailSampling` or `RandomSampling` installed
+
+- `NO_LOGGING_PATHS` skips path prefixes entirely: no event is created and no collectors run
+
+  ```python
+  WIDE_EVENTS = {
+      "NO_LOGGING_PATHS": ["/static/", "/media/", "/health", "/metrics"],
+  }
+  ```
+
+- Use settings for URL prefixes you never want logged; use decorators for views you own
 
 ---
 
 ## Settings reference
 
-<!-- NOTES: the full WIDE_EVENTS dict, every key with its default. Table or annotated -->
-<!-- code block -- pick one and be exhaustive; this is the section people return to. -->
+- All settings live in one `WIDE_EVENTS` dict:
+
+  | Key | Default | Notes |
+  |---|---|---|
+  | `COLLECTORS` | `DEFAULT_COLLECTORS` (`User`, `MetaData`) | dotted paths; setting it **replaces** the list; built-ins always run |
+  | `STATIC_FIELDS` | `{}` | merged into every event |
+  | `LOGGER_NAME` | `"wide_events.request"` | the logger your `LOGGING` config should target |
+  | `NO_LOGGING_PATHS` | `[]` | path prefixes skipped entirely |
+  | `REQUEST_ID.TRUST_ID_HEADER` | `True` | `True`: always reuse an incoming `X-Request-Id`; `False`: always generate a new id |
+  | `REQUEST_ID.RESPONSE_HEADER` | `"X-Request-Id"` | name of the response header that carries the id; falsy = don't set it |
+  | `REQUEST_ID.ID_GENERATOR` | uuid4 hex | callable returning a new id |
+
+- `REQUEST_ID` is merged key by key with the defaults; the other keys are replaced whole
+- Sampling settings are passed to the filter in `LOGGING`
 
 ## Compatibility
 
-<!-- NOTES: supported Python and Django versions; WSGI/ASGI; thread and async safety. -->
+`django-wide-events` supports Python 3.10 and newer with Django 4.2 LTS and 5.x, under both WSGI and ASGI.
+
+The event lives in a `ContextVar`, so it follows the request wherever Python copies the context: views and code run through `sync_to_async` or `asyncio.to_thread` all write to the same event.
+
+**One caveat: manual threads.** A thread started with `threading.Thread(...)` or a bare `ThreadPoolExecutor.submit(...)` begins with an empty context, so anything it writes is silently lost. Run such code inside `contextvars.copy_context().run(...)` to give it access to the request's event.
 
 ---
 
+## Design philosophy
+
+The package is built to be modular. Each part does one job: the middleware collects, collectors and blocks supply fields, filters decide what's kept, and formatters decide how it looks. Every part plugs into Django's standard middleware and `logging` machinery rather than working around it.
+
+Nearly everything can be customised. When the settings don't cover your case, subclass the part in question (the middleware, a collector, a sampling filter or rule, a formatter) and override only the behaviour you need.
+
 ## Documentation
 
-<!-- NOTES: links out to docs/. Decide the split: how much lives in the README vs. -->
-<!-- docs/EXAMPLE_USAGE.md, so the two don't drift. -->
+This README is the usage reference. For what happens under the hood (the context variables, event blocks, collectors and middleware) read [docs/INTERNALS.md](docs/INTERNALS.md). Planned features that aren't built yet are collected in [docs/ROADMAP.md](docs/ROADMAP.md). `docs/EXAMPLE_USAGE.md` served as the planning document and is retired now that these files cover it.
 
 ## Status
 
-<!-- NOTES: pre-1.0, what's stable vs. moving. Link the roadmap. -->
+The project is pre-1.0 (`0.1.0`). Event blocks, collector hooks and the filter and formatter wiring are considered stable; setting names may still change before 1.0. See [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
 
 ## Contributing
 
-<!-- NOTES: dev setup (uv sync), running tests (uv run pytest). -->
+- `uv sync`
+- `uv run pytest`
+- The tests use a small Django project in `tests/`
 
 ## Prior art
 
-<!-- NOTES: loggingsucks.com, and the canonical-log-line lineage generally. -->
+The pattern comes from <https://loggingsucks.com/>, which builds on Stripe's "canonical log lines" and the wide events popularised by Honeycomb and the observability-2.0 movement.
 
 ## License
 
-<!-- NOTES: name it and link LICENSE. -->
+GPL-3.0. See [LICENSE](LICENSE).
