@@ -161,7 +161,8 @@ class WideEventMiddleware:
         return None
 
     def run_hook_phase(self, phase:str, *args, is_response_none:bool=False):
-        phase_hooks = self.hooks.get(phase) if not is_response_none else self.hooks.get(CollectorHooks.on_finish_no_response.value)
+        phase = phase if not is_response_none else CollectorHooks.on_finish_no_response.value
+        phase_hooks = self.hooks.get(phase)
         collectors = ContextCollectors.get()
         for i in phase_hooks: # Go loud if the phase does not exist
             collector = collectors[i]
