@@ -4,20 +4,41 @@ version = "0.1.0"
 description = "One wide event per Django request: canonical log lines built from pluggable collectors and blocks."
 readme = "README.md"
 requires-python = ">=3.10"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 authors = [
     { name = "moonlitmarigold", email = "moonlitmarigold12@gmail.com" }
 ]
+keywords = ["django", "logging", "wide events", "canonical log lines", "observability", "structured logging"]
 classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
     "Framework :: Django",
     "Framework :: Django :: 4.2",
-    "Framework :: Django :: 5.0",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: System :: Logging",
 ]
 dependencies = [
     "contextvars>=2.4",
     "django>=4.2",
     "django-appconf>=1.2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/moonlitmarigold/django-wide-events"
+Repository = "https://github.com/moonlitmarigold/django-wide-events"
+Issues = "https://github.com/moonlitmarigold/django-wide-events/issues"
+Documentation = "https://github.com/moonlitmarigold/django-wide-events/tree/main/docs"
 
 [dependency-groups]
 dev = [
