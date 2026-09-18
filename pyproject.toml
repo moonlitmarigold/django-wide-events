@@ -29,9 +29,7 @@ classifiers = [
     "Topic :: System :: Logging",
 ]
 dependencies = [
-    "contextvars>=2.4",
     "django>=4.2",
-    "django-appconf>=1.2.0",
 ]
 
 [project.urls]
