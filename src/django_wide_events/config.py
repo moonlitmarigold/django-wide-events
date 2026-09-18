@@ -14,7 +14,7 @@ DEFAULTS = {
     "REQUEST_ID": {
         "TRUST_ID_HEADER": True, # TRUE: Always trust False: Never
         "RESPONSE_HEADER": "X-Request-Id",
-        "ID_GENERATOR": "django_wide_events.ids.uuid4.hex",
+        "ID_GENERATOR": "django_wide_events.ids.uuid4_hex",
     }
     # "SAMPLING": {"BASE_RATE": 1, "SLOW_MS": 1000, "KEEP_RULES": []}, Sampling on the filter
 }
@@ -40,8 +40,8 @@ class WideEventSettings:
         else:
             value = user[key]
 
-        if key in IMPORT_STRINGS:
-            value = [import_string(p) for p in value]
+        # import string if present
+        value = self.import_string_key(key, value)
 
         self._cache[key] = value
         return value
@@ -49,6 +49,25 @@ class WideEventSettings:
     def reload(self, **kwargs):
         if kwargs.get("setting") == "WIDE_EVENTS":
             self._cache.clear()
+
+    @staticmethod
+    def import_string_key(key, value):
+        if isinstance(value, dict):
+            for _k, _v in value.items():
+                value[_k] =  WideEventSettings.import_string_key(_k, _v)
+            return value
+
+        if key in IMPORT_STRINGS:
+            return WideEventSettings._import(value)
+        return value
+
+    @staticmethod
+    def _import(value):
+        if isinstance(value, list):
+            return [WideEventSettings._import(p) for p in value]
+        if isinstance(value, str):
+            return import_string(value)
+        return value
 
 wide_event_settings = WideEventSettings()
 setting_changed.connect(wide_event_settings.reload)
