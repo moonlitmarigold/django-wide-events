@@ -112,7 +112,9 @@ Framework fields (`route`, `status_code`, `duration_ms`, `user`) sit next to you
 
 ## Lifecycle of a log in this project
 
-<!-- TODO (Alex): planned for later — request -> middleware -> collectors / blocks -> finally -> filter -> formatter -> handler -->
+![Lifecycle of a log](https://raw.githubusercontent.com/moonlitmarigold/django-wide-events/main/docs/request_cycle.svg)
+
+Each step is explained in detail in [docs/INTERNALS.md](https://github.com/moonlitmarigold/django-wide-events/blob/main/docs/INTERNALS.md).
 
 ---
 
@@ -185,7 +187,7 @@ def fetch_file(picture_id):
 - `parent = OtherBlock` nests the block; the parent can't be abstract or `multiple`
 - `TimerEventBlock.timer(name)` works as a context manager or via `start_timer()` / `stop_timer()`, and writes `timers.<name>_ms`
 - Class flags: `drop_none`, `append_list`, `use_namespace_on_write`
-- Advanced: the raw event API behind the blocks is described in [docs/INTERNALS.md](docs/INTERNALS.md)
+- Advanced: the raw event API behind the blocks is described in [docs/INTERNALS.md](https://github.com/moonlitmarigold/django-wide-events/blob/main/docs/INTERNALS.md)
 
 ---
 
@@ -196,7 +198,7 @@ def fetch_file(picture_id):
 - A collector that raises never breaks the request; the error is recorded under `hook_error.hook_errors`
 - Collectors are stateful: anything stored in `__init__` or `on_create` is still there for the later hooks
 - A fresh set of collectors is created at the start of every request
-- Built-in and default collectors: see [docs/INTERNALS.md](docs/INTERNALS.md#collectors-reference)
+- Built-in and default collectors: see [docs/INTERNALS.md](https://github.com/moonlitmarigold/django-wide-events/blob/main/docs/INTERNALS.md#collectors-reference)
 
 ### Example
 
@@ -384,11 +386,11 @@ Nearly everything can be customised. When the settings don't cover your case, su
 
 ## Documentation
 
-This README is the usage reference. For what happens under the hood (the context variables, event blocks, collectors and middleware) read [docs/INTERNALS.md](docs/INTERNALS.md). Planned features that aren't built yet are collected in [docs/ROADMAP.md](docs/ROADMAP.md). `docs/EXAMPLE_USAGE.md` served as the planning document and is retired now that these files cover it.
+This README is the usage reference. For what happens under the hood (the context variables, event blocks, collectors and middleware) read [docs/INTERNALS.md](https://github.com/moonlitmarigold/django-wide-events/blob/main/docs/INTERNALS.md). Planned features that aren't built yet are collected in [docs/ROADMAP.md](https://github.com/moonlitmarigold/django-wide-events/blob/main/docs/ROADMAP.md). `docs/EXAMPLE_USAGE.md` served as the planning document and is retired now that these files cover it.
 
 ## Status
 
-The project is pre-1.0 (`0.1.0`). Event blocks, collector hooks and the filter and formatter wiring are considered stable; setting names may still change before 1.0. See [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
+The project is pre-1.0 (`0.1.0`). Event blocks, collector hooks and the filter and formatter wiring are considered stable; setting names may still change before 1.0. See [docs/ROADMAP.md](https://github.com/moonlitmarigold/django-wide-events/blob/main/docs/ROADMAP.md) for what comes next.
 
 ## Contributing
 
@@ -402,4 +404,4 @@ The pattern comes from <https://loggingsucks.com/>, which builds on Stripe's "ca
 
 ## License
 
-GPL-3.0. See [LICENSE](LICENSE).
+GPL-3.0. See [LICENSE](https://github.com/moonlitmarigold/django-wide-events/blob/main/LICENSE).
