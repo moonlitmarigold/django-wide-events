@@ -1,0 +1,44 @@
+
+flowchart LR
+    subgraph MW["Middleware"]
+        direction TB
+
+        subgraph INIT["__init__ — once, at startup"]
+            direction TB
+            classes["Assemble collector classes<br/>(built-ins, factories, COLLECTORS)"] --> table["Build the hook table<br/>per phase"]
+            table --> order["Apply hook ordering<br/>(Duration first / last)"]
+        end
+
+        subgraph CALL["__call__ — every request"]
+            direction TB
+            req([Request]) --> init["Init collectors"]
+            init --> create["on_create hooks"]
+            create --> view["get_response<br/>(view runs, blocks write to the event)"]
+            view --> raised{"Exception?"}
+            raised -- yes --> exc["on_exception hooks"]
+            raised -- no --> hasresp{"Response?"}
+            exc --> hasresp
+            hasresp -- yes --> finish["on_finish hooks"]
+            hasresp -- no --> finishnr["on_finish_no_response hooks"]
+            finish --> log["Log the event once"]
+            finishnr --> log
+        end
+
+        INIT --> CALL
+    end
+
+    subgraph F["Filter"]
+        direction TB
+        rules{"Matches a<br/>keep rule?"}
+        rules -- yes --> kept(["Kept"])
+        rules -- no --> sample{"Deterministic sample<br/>on request_id"}
+        sample -- kept --> kept
+        sample -- dropped --> drop(["Dropped"])
+    end
+
+    subgraph FMT["Formatter"]
+        direction TB
+        json["Output JSON"] --> out(["Log line"])
+    end
+
+    MW --> F --> FMT
