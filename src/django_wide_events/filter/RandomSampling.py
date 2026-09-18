@@ -26,6 +26,7 @@ class RandomSampling(logging.Filter):
 
         res = self._filter(record, event)
         if not res: # if filter returns None, then normal sample, if not just return true
+            event['sample_rate'] = self.base_rate
             return self.sample_on_base_rate(self.base_rate, event)
         return True
 
