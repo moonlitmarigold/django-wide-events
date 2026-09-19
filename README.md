@@ -1,18 +1,69 @@
 # django-wide-events
 
+![Static Badge](https://img.shields.io/badge/github-repo-blue?logo=github)
+
+
 One rich, structured log line per request, instead of a dozen scattered ones.
 
 `django-wide-events` brings the *wide event* (or *canonical log line*) pattern to Django. It is built on Django's own `logging`, so it drops into the `LOGGING` config you already have instead of replacing it. The pattern is described in detail at <https://loggingsucks.com/>.
 
-<!-- badges: PyPI version, Python versions, Django versions, license, CI -->
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](https://github.com/moonlitmarigold/django-wide-events/blob/main/pyproject.toml)
+[![Django](https://img.shields.io/badge/django-4.2%20%7C%205.2%20%7C%206.0-092E20?logo=django&logoColor=white)](https://github.com/moonlitmarigold/django-wide-events/blob/main/pyproject.toml)
+[![License](https://img.shields.io/github/license/moonlitmarigold/django-wide-events)](https://github.com/moonlitmarigold/django-wide-events/blob/main/LICENSE)
+[![Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/moonlitmarigold/django-wide-events/blob/main/docs/ROADMAP.md)
+
+<!-- badges to add later: PyPI version (after first release), CI (once a workflow exists) -->
 
 ---
 
-## Why wide events
+## Table of contents
+
+1. [Why wide events](#-why-wide-events)
+   1. [How is this different from django-structlog?](#how-is-this-different-from-django-structlog)
+   2. [What one event looks like](#what-one-event-looks-like)
+2. [Install](#-install)
+3. [Quickstart](#-quickstart)
+4. [Lifecycle of a log in this project](#-lifecycle-of-a-log-in-this-project)
+5. [Event blocks](#-event-blocks)
+   1. [Example](#example)
+   2. [Rules](#rules)
+6. [Collectors](#-collectors)
+   1. [Example](#example-1)
+7. [Static fields](#-static-fields)
+8. [Sampling](#-sampling)
+9. [Formatters](#-formatters)
+10. [Per-view control](#-per-view-control)
+11. [Settings reference](#-settings-reference)
+12. [Compatibility](#-compatibility)
+13. [Design philosophy](#-design-philosophy)
+14. [Documentation](#-documentation)
+15. [Status](#-status)
+16. [Contributing](#-contributing)
+17. [Prior art](#-prior-art)
+18. [License](#-license)
+
+---
+
+## 💡 Why wide events
 
 Scattered log lines describe what the *code* did. A wide event describes what happened to the *request*. Instead of a dozen `logger.info(...)` calls spread over middleware, views and services, each request builds up one structured record as it runs and emits it once when it finishes.
 
 That record is meant to be wide: user context, route, status, timings and your own domain data all sit side by side. With many fields per event, your logs can be queried like an analytics table ("slow downloads by paid users, grouped by route") instead of grepped line by line. The full argument is at <https://loggingsucks.com/>.
+
+### How is this different from django-structlog?
+
+  [django-structlog](https://github.com/jrobichaud/django-structlog) adds request
+  context (request id, user, IP) to every log line you write, and logs
+  `request_started` / `request_finished` itself. It makes scattered logs easier to
+  correlate.
+
+  django-wide-events replaces the scattered lines with one event per request that
+  you build up as the request runs. On top of that it adds:
+
+  - **Tail sampling** as a standard `logging.Filter`: errors, slow requests and writes are always kept, the rest
+  sampled
+  - **Namespaced event blocks** for nested, domain-specific fields and timers
+  - **No extra logging framework**: just Django and stdlib `logging`
 
 ### What one event looks like
 
@@ -39,12 +90,12 @@ Framework fields (`route`, `status_code`, `duration_ms`, `user`) sit next to you
 
 ---
 
-## Install
+## 📦 Install
 
 - `pip install django-wide-events` / `uv add django-wide-events`
 - Requires Python >= 3.10 and Django >= 4.2
 
-## Quickstart
+## 🚀 Quickstart
 
 - Add the middleware to `MIDDLEWARE`, as early as possible, so the event covers (and times) the rest of the stack
   - No `INSTALLED_APPS` entry needed
@@ -110,7 +161,7 @@ Framework fields (`route`, `status_code`, `duration_ms`, `user`) sit next to you
 
 ---
 
-## Lifecycle of a log in this project
+## 🔄 Lifecycle of a log in this project
 
 ![Lifecycle of a log](https://raw.githubusercontent.com/moonlitmarigold/django-wide-events/main/docs/request_cycle.svg)
 
@@ -118,7 +169,7 @@ Each step is explained in detail in [docs/INTERNALS.md](https://github.com/moonl
 
 ---
 
-## Event blocks
+## 🧱 Event blocks
 
 - Blocks are **the intended way to write to the event**
 - A block is a class with a `namespace`; everything it writes lands under that key in the event
@@ -191,7 +242,7 @@ def fetch_file(picture_id):
 
 ---
 
-## Collectors
+## 🪝 Collectors
 
 - Collectors add framework-level fields at fixed points in the event's lifecycle: `on_create`, `on_exception`, `on_finish`, `on_finish_no_response`
 - A collector only runs for the hooks it overrides
@@ -244,7 +295,7 @@ def fetch_file(picture_id):
   }
   ```
 
-## Static fields
+## 📌 Static fields
 
 - `STATIC_FIELDS`: fixed fields written on every event, e.g. `service`, `env`, `commit`, `region`
 - `None` values are dropped
@@ -259,7 +310,7 @@ def fetch_file(picture_id):
   }
   ```
 
-## Sampling
+## 🎲 Sampling
 
 - Sampling is a standard `logging.Filter`, so it's configured in `LOGGING`
 - `TailSampling` keeps every event that matches a rule, and 1 in `base_rate` of the rest:
@@ -297,7 +348,7 @@ def fetch_file(picture_id):
 - Built-in rules take options, e.g. `SlowRequest(slow_ms=500)`, when you list them yourself
 - `RandomSampling` takes the same arguments but has no rules
 
-## Formatters
+## 🎨 Formatters
 
 - `JSONFORMATTER` writes the event as one JSON line; any `exc_info` becomes `error.{type, stack}`
 - `GoogleFormatter` does the same, using a `severity` field for Google Cloud Logging
@@ -317,7 +368,7 @@ def fetch_file(picture_id):
 
 ---
 
-## Per-view control
+## 🎛️ Per-view control
 
 - Decorators mark individual views; they never add data:
 
@@ -351,7 +402,7 @@ def fetch_file(picture_id):
 
 ---
 
-## Settings reference
+## ⚙️ Settings reference
 
 - All settings live in one `WIDE_EVENTS` dict:
 
@@ -368,7 +419,7 @@ def fetch_file(picture_id):
 - `REQUEST_ID` is merged key by key with the defaults; the other keys are replaced whole
 - Sampling settings are passed to the filter in `LOGGING`
 
-## Compatibility
+## ✅ Compatibility
 
 `django-wide-events` supports Python 3.10 and newer with Django 4.2 LTS and 5.x, under both WSGI and ASGI.
 
@@ -378,30 +429,30 @@ The event lives in a `ContextVar`, so it follows the request wherever Python cop
 
 ---
 
-## Design philosophy
+## 🧭 Design philosophy
 
 The package is built to be modular. Each part does one job: the middleware collects, collectors and blocks supply fields, filters decide what's kept, and formatters decide how it looks. Every part plugs into Django's standard middleware and `logging` machinery rather than working around it.
 
 Nearly everything can be customised. When the settings don't cover your case, subclass the part in question (the middleware, a collector, a sampling filter or rule, a formatter) and override only the behaviour you need.
 
-## Documentation
+## 📚 Documentation
 
 This README is the usage reference. For what happens under the hood (the context variables, event blocks, collectors and middleware) read [docs/INTERNALS.md](https://github.com/moonlitmarigold/django-wide-events/blob/main/docs/INTERNALS.md). Planned features that aren't built yet are collected in [docs/ROADMAP.md](https://github.com/moonlitmarigold/django-wide-events/blob/main/docs/ROADMAP.md). `docs/EXAMPLE_USAGE.md` served as the planning document and is retired now that these files cover it.
 
-## Status
+## 🚧 Status
 
 The project is pre-1.0 (`0.1.0`). Event blocks, collector hooks and the filter and formatter wiring are considered stable; setting names may still change before 1.0. See [docs/ROADMAP.md](https://github.com/moonlitmarigold/django-wide-events/blob/main/docs/ROADMAP.md) for what comes next.
 
-## Contributing
+## 🤝 Contributing
 
 - `uv sync`
 - `uv run pytest`
 - The tests use a small Django project in `tests/`
 
-## Prior art
+## 🔍 Prior art
 
 The pattern comes from <https://loggingsucks.com/>, which builds on Stripe's "canonical log lines" and the wide events popularised by Honeycomb and the observability-2.0 movement.
 
-## License
+## 📄 License
 
 GPL-3.0. See [LICENSE](https://github.com/moonlitmarigold/django-wide-events/blob/main/LICENSE).
