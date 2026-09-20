@@ -1,7 +1,5 @@
 # django-wide-events
 
-![Static Badge](https://img.shields.io/badge/github-repo-blue?logo=github)
-
 
 One rich, structured log line per request, instead of a dozen scattered ones.
 

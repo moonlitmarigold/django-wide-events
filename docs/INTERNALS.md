@@ -1,5 +1,7 @@
 # django-wide-events — internals
 
+Currently under construction
+
 <!-- one-line scope: how the package works under the hood. Usage lives in the README; -->
 <!-- this page is for contributors and for users who hit an edge case. -->
 
