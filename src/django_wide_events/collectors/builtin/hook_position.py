@@ -20,7 +20,7 @@ class Change:
 
 
 @dataclasses.dataclass()
-class ChangeHookPosition:
+class ChangeHookPositionClass:
 
     cls: type[Collector]
     collectors: list[CollectorEntry]
@@ -71,4 +71,4 @@ class HookPosition:
         collectors: list[CollectorEntry],
         hooks: dict[str, list[int]],
     ) -> None:
-        ChangeHookPosition(self.cls, collectors, hooks, self.changes).convert()
+        ChangeHookPositionClass(self.cls, collectors, hooks, self.changes).convert()

@@ -4,7 +4,6 @@ from ..collectors.builtin import (
     BUILTIN_COLLECTORS,
     FACTORY_COLLECTORS,
     Change,
-    ChangeHookPosition,
     HookPosition,
     Duration,
 )
