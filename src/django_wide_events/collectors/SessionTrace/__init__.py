@@ -1,7 +1,7 @@
 from .Base import SessionTrace
 
 DEFAULT_SESSION_TRACE = [
-    "django_wide_events.collectors.SessionTrace.[[[["
+    # dotted paths of user-provided session tracers go here
 ]
 
 from .builtin import CheckPaths, CheckViewName

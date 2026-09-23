@@ -23,7 +23,7 @@ class CheckViewName(SessionTrace):
 
     def should_trace(self, request, view_func, view_args, view_kwargs) -> bool:
         match = request.resolver_match
-        view_name = match.view_nam
+        view_name = match.view_name
 
         for _view_name in self.NO_TRACE_VIEW_NAMES:
             if view_name == _view_name:
