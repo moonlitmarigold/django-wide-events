@@ -15,6 +15,11 @@ DEFAULTS = {
         "TRUST_ID_HEADER": True, # TRUE: Always trust False: Never
         "RESPONSE_HEADER": "X-Request-Id",
         "ID_GENERATOR": "django_wide_events.ids.uuid4_hex",
+    },
+    "SESSION_TRACE":{
+        "NO_TRACE_PATHS": ["/about/", "/pricing/"],
+        "NO_TRACE_VIEW_NAMES": ["home"],           # URL names, checked in process_view
+        "ONLY_EXISTING_SESSIONS": True,        # don't create sessions for bots
     }
     # "SAMPLING": {"BASE_RATE": 1, "SLOW_MS": 1000, "KEEP_RULES": []}, Sampling on the filter
 }
