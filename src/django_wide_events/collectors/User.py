@@ -2,7 +2,7 @@ from .Base import Collector
 
 class User(Collector):
 
-    def on_create(self, request):
+    def on_finish(self, request, response=None):
 
         event_user = {}
 
@@ -16,4 +16,7 @@ class User(Collector):
 
         if event_user:
             self.set(user=event_user)
+
+    def on_finish_no_response(self, request, response=None):
+        self.on_finish(request, response)
 
