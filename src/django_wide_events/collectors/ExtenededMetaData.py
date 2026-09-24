@@ -1,5 +1,4 @@
 from .Base import Collector
-from datetime import datetime, timezone as _timezone
 from django.utils import timezone
 
 class MetaData(Collector):
@@ -9,7 +8,6 @@ class MetaData(Collector):
         meta = {
             "method": request.method,
             "timezone": timezone.get_current_timezone_name(),
-            "timestamp" : datetime.now(_timezone.utc).isoformat(timespec='milliseconds'),
         }
         self.set(meta=meta)
 

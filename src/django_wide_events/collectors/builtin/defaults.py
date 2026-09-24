@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from ...config import wide_event_settings
 from ...event_blocks.TimerEventBlock import _Timer
 from ..Base import Collector
@@ -18,6 +20,13 @@ class Duration(Collector):
 
     def on_finish_no_response(self, request, response=None):
         self.timer.stop_timer()
+
+
+@builtin_collector
+class Timestamp(Collector):
+
+    def on_create(self, request):
+        self.set(started_at=datetime.now(timezone.utc).isoformat(timespec='milliseconds'))
 
 
 @builtin_collector
