@@ -6,6 +6,7 @@ _current: ContextVar[dict | None] = ContextVar("django_wide_events.event", defau
 _blocks: ContextVar[dict | None] = ContextVar("django_wide_events.block", default=None)
 _collectors: ContextVar[list | None] = ContextVar("django_wide_events.collectors", default=None)
 _capture:ContextVar[bool | None] = ContextVar("django_wide_events.capture", default=None)
+_trace:ContextVar[bool | None] = ContextVar("django_wide_events.trace", default=None)
 
 
 class BlockAlreadyAttached(Exception):
@@ -153,11 +154,11 @@ class ContextCapture(BaseContext):
 
     @staticmethod
     def set(var:bool):
-        _capture.set(var)
+        ContextCapture._contex_var.set(var)
 
     @staticmethod
     def get():
-        return _capture.get()
+        return ContextCapture._contex_var.get()
 
     @classmethod
     def init(cls):
@@ -165,3 +166,8 @@ class ContextCapture(BaseContext):
         ctx_var = _cls.check_or_raise_contex_var()
         _cls.token = ctx_var.set(None)
         return _cls
+
+@dataclasses.dataclass
+class ContextTrace(ContextCapture):
+
+    _contex_var = _trace
