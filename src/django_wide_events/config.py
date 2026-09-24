@@ -3,8 +3,8 @@ from django.utils.module_loading import import_string
 from django.core.signals import setting_changed
 from .collectors import DEFAULT_COLLECTORS
 
-IMPORT_STRINGS = {"COLLECTORS", "ID_GENERATOR"}          # values are dotted paths -> import them
-NESTED = {"SAMPLING", "STATIC_FIELDS", "REQUEST_ID"}   # merge one level deep instead of replacing
+IMPORT_STRINGS = {"COLLECTORS", "ID_GENERATOR", "SESSION_ID_GENERATOR"}          # values are dotted paths -> import them
+NESTED = {"STATIC_FIELDS", "REQUEST_ID", "SESSION_TRACE"}   # merge one level deep instead of replacing
 
 DEFAULTS = {
     "COLLECTORS": DEFAULT_COLLECTORS,
@@ -17,9 +17,10 @@ DEFAULTS = {
         "ID_GENERATOR": "django_wide_events.ids.uuid4_hex",
     },
     "SESSION_TRACE":{
-        "NO_TRACE_PATHS": ["/about/", "/pricing/"],
-        "NO_TRACE_VIEW_NAMES": ["home"],           # URL names, checked in process_view
+        "NO_TRACE_PATHS": [],
+        "NO_TRACE_VIEW_NAMES": [],           # URL names, checked in process_view
         "ONLY_EXISTING_SESSIONS": True,        # don't create sessions for bots
+        "SESSION_ID_GENERATOR": "django_wide_events.ids.uuid4_hex",
     }
     # "SAMPLING": {"BASE_RATE": 1, "SLOW_MS": 1000, "KEEP_RULES": []}, Sampling on the filter
 }
