@@ -36,35 +36,43 @@ class SessionID:
 
         if self.check_session_trace(request, response):
 
-            # TODO: Improve logic to skip the 'is_break
-            trace, is_break = self.handle_trace_logic_func(
-                request, response
-            )
+            # TODO: Cleanup lambdas
+            add_func = self.handle_trace_logic_func(request, response)
 
-            if not is_break:
-                SessionIDAddEvent.add_id(
-                    trace if trace is not None else self.id_generation_func()
-                )
-
-        SessionIDAddEvent.no_session_id()
+            add_func(self.id_generation_func)
+        #SessionIDAddEvent.unknow_session_status()
         return response
+
+    @staticmethod
+    def add_session_id(trace, id_generation_func):
+        SessionIDAddEvent.debug_session_trace(trace is None)
+        if trace is None:
+            SessionIDAddEvent.add_id(id_generation_func)
+
+        SessionIDAddEvent.add_id(
+            trace if trace is not None else id_generation_func()
+        )
+
+    @staticmethod
+    def get_trace_from_session(request):
+        return request.session.get("wide_events_trace", None)
 
     @staticmethod
     def on_session_trace_only_existing_sessions(request, response):
         if request.session.session_key is None:
-            return None, True
+            return lambda id_gen: SessionIDAddEvent.invalid_session()
 
-        # Get the actual session and if the key is valid
-        trace = request.session.get("wide_events_trace", None)
+        trace = SessionID.get_trace_from_session(request)
+
         if request.session.session_key is None:
-            return None, True
+            return lambda id_gen: SessionIDAddEvent.invalid_session()
 
-        return trace, False
+        return lambda id_gen: SessionID.add_session_id(trace, id_gen)
 
     @staticmethod
     def on_session_trace_not_only_existing_sessions(request, response):
-        trace = request.session.get("wide_events_trace", None)
-        return trace, False
+        trace = SessionID.get_trace_from_session(request)
+        return lambda id_gen: SessionID.add_session_id(trace, id_gen)
 
     def check_session_trace(self, *args):
 
