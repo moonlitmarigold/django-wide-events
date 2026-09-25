@@ -47,7 +47,7 @@ class CheckResponseError(SessionTrace):
 
     def should_trace(self, request, response) -> bool | None:
         if response is None:
-            return False
+            return True
         if response.status_code >= 500:
-            return False
+            return True
         return None

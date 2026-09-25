@@ -5,7 +5,7 @@ from ..event_blocks.SessionEvents import SessionIDAddEvent
 from ..context import ContextTrace
 
 class SessionIDErrorEvent(EventBlock):
-
+    namespace = "NotImplemented"
     pass
 
 class SessionID:
@@ -36,6 +36,7 @@ class SessionID:
 
         if self.check_session_trace(request, response):
 
+            # TODO: Improve logic to skip the 'is_break
             trace, is_break = self.handle_trace_logic_func(
                 request, response
             )
@@ -76,5 +77,5 @@ class SessionID:
 
     def process_view(self, request, view_func, view_args, view_kwargs):
         # TODO: Make error event an list
-
+        # TODO: Trace logic for decorators
         return
