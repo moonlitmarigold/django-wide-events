@@ -7,7 +7,11 @@ ROOT_URLCONF = "tests.urls"
 
 MIDDLEWARE = [
     "django_wide_events.middleware.wide_event_middleware.WideEventMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django_wide_events.middleware.session_traceability_middleware.SessionID",
 ]
+
+SESSION_ENGINE="django.contrib.sessions.backends.cache"
 
 INSTALLED_APPS = [
     "django.contrib.auth",
