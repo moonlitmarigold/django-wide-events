@@ -32,25 +32,32 @@ class SessionID:
 
 
     def __call__(self, request):
+
+        ctx = ContextTrace.init()
+        SessionIDAddEvent.init()
         response =  self.get_response(request)
 
         if self.check_session_trace(request, response):
 
             # TODO: Cleanup lambdas
-            add_func = self.handle_trace_logic_func(request, response)
+            _func = self.handle_trace_logic_func(request, response)
 
-            add_func(self.id_generation_func)
+            _func(self)
         #SessionIDAddEvent.unknow_session_status()
+        ctx.drop()
         return response
 
-    @staticmethod
-    def add_session_id(trace, id_generation_func):
-        SessionIDAddEvent.debug_session_trace(trace is None)
+    def add_session_id(self, trace, request):
+        #SessionIDAddEvent.debug_session_trace(trace is None)
         if trace is None:
-            SessionIDAddEvent.add_id(id_generation_func)
+            SessionIDAddEvent.add_id(self.id_generation_func)
+
+        if trace is None:
+            trace = self.id_generation_func()
+            request.session["wide_events_trace"] = trace
 
         SessionIDAddEvent.add_id(
-            trace if trace is not None else id_generation_func()
+            trace
         )
 
     @staticmethod
@@ -60,30 +67,32 @@ class SessionID:
     @staticmethod
     def on_session_trace_only_existing_sessions(request, response):
         if request.session.session_key is None:
-            return lambda id_gen: SessionIDAddEvent.invalid_session()
+            return lambda _: SessionIDAddEvent.no_existing_session()
 
         trace = SessionID.get_trace_from_session(request)
 
         if request.session.session_key is None:
-            return lambda id_gen: SessionIDAddEvent.invalid_session()
+            return lambda _: SessionIDAddEvent.invalid_session()
 
-        return lambda id_gen: SessionID.add_session_id(trace, id_gen)
+        return lambda _cls: SessionID.add_session_id(_cls, trace, request)
 
     @staticmethod
     def on_session_trace_not_only_existing_sessions(request, response):
         trace = SessionID.get_trace_from_session(request)
-        return lambda id_gen: SessionID.add_session_id(trace, id_gen)
+        return lambda _cls: SessionID.add_session_id(_cls, trace, request)
 
     def check_session_trace(self, *args):
 
         for session_tracer in self.session_traces_classes:
-            # ADD: Session Trace error
             res = session_tracer.should_trace(*args)
             if res is not None:
                 return res
         return True
 
-    def process_view(self, request, view_func, view_args, view_kwargs):
-        # TODO: Make error event an list
-        # TODO: Trace logic for decorators
+    @staticmethod
+    def process_view(request, view_func, view_args, view_kwargs):
+        view = getattr(view_func, "view_class", view_func)
+        _trace:bool | None = getattr(view, "trace", None)
+        if _trace is not None:
+            ContextTrace.set(_trace)
         return

@@ -1,1 +1,2 @@
 from .wide_event_middleware import WideEventMiddleware
+from .session_traceability_middleware import SessionID
