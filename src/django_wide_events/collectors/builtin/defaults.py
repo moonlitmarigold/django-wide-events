@@ -43,9 +43,10 @@ class StatusCode(Collector):
 class RequestRoute(Collector):
 
     def on_finish(self, request, response):
+        self.set(route=request.path)
         match = getattr(request, "resolver_match", None)
         if match:
-            self.set(route=match.view_name)
+            self.set(view_name=match.view_name)
 
     def on_finish_no_response(self, request, response=None):
         self.on_finish(request, response)

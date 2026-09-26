@@ -69,7 +69,7 @@ class TestWideEventMiddleware(EventCaptureMixin, TestCase):
 
     def test_records_route_and_status(self):
         self.client.get("/")
-        assert self.event["route"] == "ok"
+        assert self.event["view_name"] == "ok"
         assert self.event["status_code"] == 200
         assert self.handler.records[-1].levelno == logging.INFO
 
@@ -88,7 +88,7 @@ class TestWideEventMiddleware(EventCaptureMixin, TestCase):
     def test_view_exception_records_error_and_status_500(self):
         self.client.get("/boom/")
         assert self.event["status_code"] == 500
-        assert self.event["route"] == "boom"
+        assert self.event["view_name"] == "boom"
         assert self.handler.records[-1].levelno == logging.ERROR
         error = self.event["error"]
         assert error["type"] == "ValueError"
