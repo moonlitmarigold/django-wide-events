@@ -10,6 +10,7 @@ from django.http import Http404, HttpResponse
 from django.urls import path
 import time
 from django_wide_events.decorators import never_capture, always_capture
+from django_wide_events.decorators import always_trace, never_trace
 
 def ok_view(request):
     return HttpResponse("ok")
@@ -45,6 +46,14 @@ def never_view(request):
 def always_view(request):
     return HttpResponse("ok")
 
+@always_trace
+def always_trace(request):
+    return HttpResponse("ok")
+
+@never_trace
+def never_trace(request):
+    return HttpResponse("ok")
+
 from event_block_view import test_event_block
 
 
@@ -58,5 +67,7 @@ urlpatterns = [
     path("never/", never_view, name="never_view"),
     path("always/", always_view, name="always_view"),
     path("event_block/", test_event_block, name="test_event_block"),
+    path("never_trace/", never_trace, name="never_trace_view"),
+    path("always_trace/", always_trace, name="always_trace_view"),
 
 ]
