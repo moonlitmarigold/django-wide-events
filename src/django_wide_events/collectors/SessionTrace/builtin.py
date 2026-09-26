@@ -14,6 +14,7 @@ class CheckPaths(SessionTrace):
         route = getattr(request, "path")
         for path in self.NO_TRACE_PATH:
             if route.startswith(path):
+                SessionIDAddEvent.no_trace_path()
                 return False
         return None
 
@@ -31,6 +32,7 @@ class CheckViewName(SessionTrace):
 
         for _view_name in self.NO_TRACE_VIEW_NAMES:
             if view_name == _view_name:
+                SessionIDAddEvent.no_trace_view()
                 return False
         return None
 
@@ -39,6 +41,7 @@ class CheckMustTrace(SessionTrace):
     def should_trace(self, request, response) -> bool | None:
         _trace = ContextTrace.get()
         if _trace is not None:
+            SessionIDAddEvent.trace_capture(_trace)
             return _trace
         return None
 
@@ -47,7 +50,9 @@ class CheckResponseError(SessionTrace):
 
     def should_trace(self, request, response) -> bool | None:
         if response is None:
+            SessionIDAddEvent.no_response()
             return True
         if response.status_code >= 500:
+            SessionIDAddEvent.no_response()
             return True
         return None
