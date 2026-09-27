@@ -11,3 +11,5 @@ DEFAULT_COLLECTORS = [
     "django_wide_events.collectors.User",
     "django_wide_events.collectors.MetaData",
 ]
+
+from . import SessionTrace

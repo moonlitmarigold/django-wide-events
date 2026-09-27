@@ -3,7 +3,7 @@ from django.utils.module_loading import import_string
 from django.core.signals import setting_changed
 from .collectors import DEFAULT_COLLECTORS
 
-IMPORT_STRINGS = {"COLLECTORS", "ID_GENERATOR", "SESSION_ID_GENERATOR"}          # values are dotted paths -> import them
+IMPORT_STRINGS = {"COLLECTORS", "ID_GENERATOR", "SESSION_ID_GENERATOR", "SESSION_CHECKS"}          # values are dotted paths -> import them
 NESTED = {"STATIC_FIELDS", "REQUEST_ID", "SESSION_TRACE"}   # merge one level deep instead of replacing
 
 DEFAULTS = {
@@ -21,6 +21,13 @@ DEFAULTS = {
         "NO_TRACE_VIEW_NAMES": [],           # URL names, checked in process_view
         "ONLY_EXISTING_SESSIONS": True,        # don't create sessions for bots
         "SESSION_ID_GENERATOR": "django_wide_events.ids.uuid4_hex",
+        "SESSION_CHECKS":[],
+        "NO_TRACE_USER_AGENTS": [              # case-insensitive substrings of the User-Agent
+            "bot", "crawler", "spider", "kube-probe", "ELB-HealthChecker", "GoogleHC",
+        ],
+        "NO_TRACE_NAMESPACES": [],             # URL namespaces, e.g. "admin"
+        "RESPECT_PRIVACY_SIGNALS": True,       # skip requests sending Sec-GPC: 1 or DNT: 1
+        "AUTHENTICATED_ONLY": False,           # skip anonymous users (needs AuthenticationMiddleware)
     }
     # "SAMPLING": {"BASE_RATE": 1, "SLOW_MS": 1000, "KEEP_RULES": []}, Sampling on the filter
 }
