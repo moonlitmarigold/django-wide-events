@@ -7,7 +7,8 @@ exceptions into responses, and ``resolver_match`` is populated so
 """
 
 from django.http import Http404, HttpResponse
-from django.urls import path
+from django.urls import include, path
+from django.contrib.auth import get_user_model, login, logout
 import time
 from django_wide_events.decorators import never_capture, always_capture
 from django_wide_events.decorators import always_trace, never_trace
@@ -54,6 +55,16 @@ def always_trace(request):
 def never_trace(request):
     return HttpResponse("ok")
 
+def login_view(request):
+    login(request, get_user_model().objects.get(username="tracer"))
+    return HttpResponse("ok")
+
+def logout_view(request):
+    logout(request)
+    return HttpResponse("ok")
+
+private_patterns = ([path("", ok_view, name="index")], "private")
+
 from event_block_view import test_event_block
 
 
@@ -69,5 +80,8 @@ urlpatterns = [
     path("event_block/", test_event_block, name="test_event_block"),
     path("never_trace/", never_trace, name="never_trace_view"),
     path("always_trace/", always_trace, name="always_trace_view"),
+    path("login/", login_view, name="login"),
+    path("logout/", logout_view, name="logout"),
+    path("private/", include(private_patterns)),
 
 ]
