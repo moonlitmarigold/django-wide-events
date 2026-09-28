@@ -65,6 +65,11 @@ def logout_view(request):
 
 private_patterns = ([path("", ok_view, name="index")], "private")
 
+def enqueue_view(request):
+    from tests.tasks import send_invoice
+    send_invoice.enqueue(invoice_id=7)
+    return HttpResponse("ok")
+
 from event_block_view import test_event_block
 
 
@@ -83,5 +88,6 @@ urlpatterns = [
     path("login/", login_view, name="login"),
     path("logout/", logout_view, name="logout"),
     path("private/", include(private_patterns)),
+    path("enqueue/", enqueue_view, name="enqueue"),
 
 ]

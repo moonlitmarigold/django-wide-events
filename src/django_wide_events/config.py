@@ -11,6 +11,7 @@ DEFAULTS = {
     "STATIC_FIELDS": {},
     "LOGGER_NAME": "wide_events.request",
     "NO_LOGGING_PATHS": [],
+    "TASK_BACKENDS": [],                   # e.g. ["django_tasks"], or dotted paths to TaskEventBackend subclasses
     "REQUEST_ID": {
         "TRUST_ID_HEADER": True, # TRUE: Always trust False: Never
         "RESPONSE_HEADER": "X-Request-Id",

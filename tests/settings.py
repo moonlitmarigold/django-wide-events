@@ -18,6 +18,13 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
 ]
 
+# Runs every task inline on enqueue(), firing enqueued -> started -> finished
+TASKS = {
+    "default": {
+        "BACKEND": "django.tasks.backends.immediate.ImmediateBackend",
+    }
+}
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -37,6 +44,9 @@ WIDE_EVENTS = {
     "COLLECTORS": [],
     "STATIC_FIELDS": {"service": "tests", "env": "test"},
     "LOGGER_NAME": "wide_events.request",
+    # only connects when a test installs the tasks app; set here rather than next to that
+    # override because override_settings runs ready() before other overrides apply
+    "TASK_BACKENDS": ["django_tasks"],
     "REQUEST_ID": {
         "TRUST_ID_HEADER": True,
         "RESPONSE_HEADER": "X-Request-Id",
