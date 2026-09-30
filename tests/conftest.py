@@ -28,14 +28,17 @@ def render_wide_events():
     # another one onto this logger. Reset and reapply, or a sampling filter from
     # an earlier test class stays in the chain and drops records this one
     # expects to keep.
-    logger = logging.getLogger(wide_event_settings.LOGGER_NAME)
-    logger.filters = []
+    loggers = [logging.getLogger(name) for name in (wide_event_settings.LOGGER_NAME, "wide_events.tasks")]
+    for logger in loggers:
+        logger.filters = []
     if getattr(settings, "LOGGING", None):
         logging.config.dictConfig(settings.LOGGING)
 
-    # Filters only run on the logger a record is emitted on, so attach to the
-    # configured logger itself rather than the "wide_events" ancestor.
+    # Filters only run on the logger a record is emitted on, so attach to each
+    # emitting logger itself rather than the "wide_events" ancestor.
     _filter = _RenderEvent()
-    logger.addFilter(_filter)
+    for logger in loggers:
+        logger.addFilter(_filter)
     yield
-    logger.removeFilter(_filter)
+    for logger in loggers:
+        logger.removeFilter(_filter)
