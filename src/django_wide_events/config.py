@@ -2,6 +2,7 @@ from django.conf import settings as django_settings
 from django.utils.module_loading import import_string
 from django.core.signals import setting_changed
 from .collectors import DEFAULT_COLLECTORS
+from .tasks.collectors import DEFAULT_TASK_COLLECTORS
 
 IMPORT_STRINGS = {"COLLECTORS", "ID_GENERATOR", "SESSION_ID_GENERATOR", "SESSION_CHECKS"}          # values are dotted paths -> import them
 NESTED = {"STATIC_FIELDS", "REQUEST_ID", "SESSION_TRACE"}   # merge one level deep instead of replacing
@@ -10,8 +11,8 @@ DEFAULTS = {
     "COLLECTORS": DEFAULT_COLLECTORS,
     "STATIC_FIELDS": {},
     "LOGGER_NAME": "wide_events.request",
+    "TASK_LOGGER_NAME": "wide_events.tasks",
     "NO_LOGGING_PATHS": [],
-    "TASK_BACKENDS": [],                   # e.g. ["django_tasks"], or dotted paths to TaskEventBackend subclasses
     "REQUEST_ID": {
         "TRUST_ID_HEADER": True, # TRUE: Always trust False: Never
         "RESPONSE_HEADER": "X-Request-Id",
@@ -29,6 +30,10 @@ DEFAULTS = {
         "NO_TRACE_NAMESPACES": [],             # URL namespaces, e.g. "admin"
         "RESPECT_PRIVACY_SIGNALS": True,       # skip requests sending Sec-GPC: 1 or DNT: 1
         "AUTHENTICATED_ONLY": False,           # skip anonymous users (needs AuthenticationMiddleware)
+    },
+    "TASK":{
+        "BACKENDS":[],
+        "TASK_COLLECTORS":DEFAULT_TASK_COLLECTORS
     }
     # "SAMPLING": {"BASE_RATE": 1, "SLOW_MS": 1000, "KEEP_RULES": []}, Sampling on the filter
 }

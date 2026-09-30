@@ -1,6 +1,10 @@
-from ..Base import TaskEventBackend
+from ..Base import TaskEventBackend, TaskPhase
 
 class DjangoTaskBackend(TaskEventBackend):
+
+    signals = {
+        "on_enqueued" : (TaskPhase.on_enqueued, lambda _: 1)
+    }
 
     def connect(self):
         from django.tasks.signals import task_enqueued, task_started, task_finished
