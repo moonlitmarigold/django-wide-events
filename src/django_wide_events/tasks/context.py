@@ -3,8 +3,7 @@ from contextvars import ContextVar, Token
 
 _task: ContextVar[dict | None] = ContextVar("django_wide_events.task", default=None)
 _task_token:ContextVar[list | None] = ContextVar("django_wide_events.task_token", default=None)
-
-
+_state: ContextVar[dict | None] = ContextVar("django_wide_events.task_state", default=None)
 
 class TaskTokenContext(BaseContext):
 
@@ -31,3 +30,7 @@ class TaskTokenContext(BaseContext):
 class TaskContext(ContextEvent):
 
     _contex_var = _task
+
+class TaskState(ContextEvent):
+
+    _contex_var = _state

@@ -54,23 +54,23 @@ class ContextEvent(BaseContext):
 
     _contex_var = _current
 
-    @staticmethod
-    def set(**kwargs):
-        ctx = ContextEvent.get()
+    @classmethod
+    def set(cls, **kwargs):
+        ctx = cls.get()
         ctx.update(kwargs)
 
-    @staticmethod
-    def update(payload:dict, drop_none:bool=True, append_lists:bool=False):
-        ctx = ContextEvent.get()
-        return ContextEvent.merge(ctx, payload, drop_none, append_lists)
+    @classmethod
+    def update(cls, payload:dict, drop_none:bool=True, append_lists:bool=False):
+        ctx = cls.get()
+        return cls.merge(ctx, payload, drop_none, append_lists)
 
-    @staticmethod
-    def merge(ctx:dict, payload:dict, drop_none:bool=True, append_lists:bool=False):
+    @classmethod
+    def merge(cls, ctx:dict, payload:dict, drop_none:bool=True, append_lists:bool=False):
         # payload is positional on purpose: taking it as **kwargs let a field named
         # 'ctx' raise TypeError and a field named 'drop_none' silently vanish.
         for key, value in payload.items():
             if isinstance(value, dict):
-                ContextEvent.merge(ctx.setdefault(key, {}), value, drop_none, append_lists)
+                cls.merge(ctx.setdefault(key, {}), value, drop_none, append_lists)
             else:
                 if drop_none and value is None:
                     continue
@@ -86,9 +86,9 @@ class ContextEvent(BaseContext):
                 ctx[key] = value
         return ctx
 
-    @staticmethod
-    def get():
-        ctx = _current.get()
+    @classmethod
+    def get(cls):
+        ctx = cls._contex_var.get()
         if ctx is None:
             return {}
         return ctx
@@ -152,13 +152,13 @@ class ContextCapture(BaseContext):
 
     _contex_var = _capture
 
-    @staticmethod
-    def set(var:bool):
-        ContextCapture._contex_var.set(var)
+    @classmethod
+    def set(cls, var:bool):
+        cls._contex_var.set(var)
 
-    @staticmethod
-    def get():
-        return ContextCapture._contex_var.get()
+    @classmethod
+    def get(cls):
+        return cls._contex_var.get()
 
     @classmethod
     def init(cls):

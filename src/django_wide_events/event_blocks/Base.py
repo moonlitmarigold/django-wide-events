@@ -1,6 +1,7 @@
 from ..context import ContextEvent, ContextBlock
 from dataclasses import dataclass
 from typing import ClassVar
+from contextvars import ContextVar
 
 @dataclass
 class EventBlock:
@@ -16,6 +17,7 @@ class EventBlock:
     append_list:ClassVar[bool] = False
 
     abstract: ClassVar[bool] = True
+    _context_event: ClassVar[type[ContextEvent]] = ContextEvent
 
     def __post_init__(self):
         self._attach()
@@ -78,9 +80,9 @@ class EventBlock:
 
     def set(self, **kwargs):
         if self.use_namespace_on_write:
-            ContextEvent.merge(self.get(), kwargs, self.drop_none, self.append_list)
+            self._context_event.merge(self.get(), kwargs, self.drop_none, self.append_list)
         else:
-            ContextEvent.update(kwargs, self.drop_none, self.append_list)
+            self._context_event.update(kwargs, self.drop_none, self.append_list)
         return self
 
     def _attach(self):
@@ -105,7 +107,7 @@ class EventBlock:
             return _block
 
     def get(self):
-        ctx = ContextEvent.get()
+        ctx = self._context_event.get()
         for part in self.get_path():
             ctx = ctx.setdefault(part, {})
         return ctx
