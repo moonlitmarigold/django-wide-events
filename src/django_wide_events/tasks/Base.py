@@ -1,11 +1,18 @@
-from .context import TaskContext, TaskTokenContext
+from ipaddress import ip_network
+
+from .context import TaskContext, TaskTokenContext, TaskState
 import logging
 from ..config import wide_event_settings
 from typing import ClassVar
-from enum import StrEnum
-from enum import auto
+from enum import StrEnum, auto
 from dataclasses import dataclass
 from typing import Callable
+import functools
+from .events import TaskHookErrorEvent
+import traceback
+from ..collectors.builtin import HookPosition, Change
+from .collectors.builtin import BUILTIN_TASK_COLLECTORS
+from ..event_blocks import EventBlock
 
 class TaskPhase(StrEnum):
 
@@ -23,6 +30,9 @@ class ContextDict:
         task = TaskContext.init()
         TaskTokenContext.add(task.token)
 
+        state = TaskState.init()
+        TaskTokenContext.add(state.token)
+
     @staticmethod
     def drop():
         tokens = TaskTokenContext.get()
@@ -31,18 +41,46 @@ class ContextDict:
         token_context.drop()
 
         task_context = TaskContext(tokens[1])
-        print(task_context)
+        task_state = TaskState(tokens[2])
+        task_state.drop()
+
         return task_context.drop()
 
-@dataclass
+@dataclass(eq=False)
 class SignalCallable:
 
     _func:Callable
-    _adapter:Callable
+    _adapter:Callable|None
+
+    def __post_init__(self):
+        if self._adapter:
+            self.__func = lambda *args, **kwargs: self._func(self._adapter(*args, **kwargs))
+        else:
+            self.__func = lambda *args, **kwargs: self._func(*args, **kwargs)
 
     def __call__(self, *args, **kwargs):
-        return self._func(self._adapter(*args, **kwargs))
+        return self.__func(*args, **kwargs)
 
+@dataclass
+class MaskCollector:
+
+    _start_func:Callable
+    _finish_func:Callable
+
+
+    def on_start(self, *args, **kwargs):
+        self._start_func()
+
+    def on_finish(self, *args, **kwargs):
+        self._finish_func()
+
+@dataclass
+class MaskEnqueueCollector:
+
+    _func:Callable
+
+    def on_enqueue(self, *args, **kwargs):
+        self._func()
 
 class TaskEventBackend:
 
@@ -53,7 +91,10 @@ class TaskEventBackend:
     # key: native signal
     # value: tuple:
     #       str[Hook], lambda: adapter
-    collector_modify_func:Callable | None = None
+    HookPositionChanges:ClassVar[tuple[HookPosition, ...] ] = ()
+    builtin_HookPositionChanges = (
+
+    )
 
 
     def __init__(self):
@@ -62,35 +103,51 @@ class TaskEventBackend:
 
         _task_settings = _settings.TASK
 
-        self._collector_classes = list(_task_settings.get("TASK_COLLECTORS"))
+        # builtin collectors always run, the configured ones replace the defaults
+        self._collector_classes = [*BUILTIN_TASK_COLLECTORS, *_task_settings.get("TASK_COLLECTORS")]
 
-        self.collectors = self.return_collectors()
+        self._collector_classes = [c() for c in self._collector_classes]
+
+        self.collectors, self.receivers = self.return_collectors()
         # Shape:
         #   key -> signal/hook
         #   value -> list of collectors
 
     def return_collectors(self):
         output_collectors = {}
+        receivers = {}
 
         for native_signal, (hook_str, _adapter) in self.signals.items():
-            _collectors = list()
-            if hook_str == TaskPhase.on_enqueued:
-                _collectors.append(self.init_ctx)
+            output_collectors[hook_str] = [
+                i for i, x in
+                [(index, getattr(col, hook_str, None)) for index, col in enumerate(self._collector_classes)]
+                if x is not None
+            ]
 
-            for col in self.collectors:
-                hook_func = getattr(col, hook_str, None)
-                if hook_func:
-                    _collectors.append(
-                        hook_func
-                    )
+            receivers[hook_str] = SignalCallable(
+                functools.partial(self.run_collector_hooks, hook_str),
+                _adapter
+            )
 
+        for change in [*self.HookPositionChanges, *self.builtin_HookPositionChanges]:
+            change.apply(self._collector_classes, output_collectors)
 
-            if hook_str == TaskPhase.on_finish:
-                _collectors.append(self.finish)
+        # Add the start and finish
+        mask_collector = MaskCollector(self.init_ctx, self.finish)
+        self._collector_classes.append(mask_collector)
+        index = len(self._collector_classes) - 1
 
-            output_collectors[hook_str] = _collectors
+        output_collectors[TaskPhase.on_start] = [index, *output_collectors[TaskPhase.on_start]]
+        output_collectors[TaskPhase.on_finish] = [*output_collectors[TaskPhase.on_finish], index]
 
-        return output_collectors
+        # Add write to the request context
+        self._collector_classes.extend(
+            [MaskEnqueueCollector(self.init_ctx), MaskEnqueueCollector(self.drop_context_to_request_event)]
+        )
+
+        output_collectors[TaskPhase.on_enqueued] = [index+1, *output_collectors[TaskPhase.on_enqueued], index+2]
+
+        return output_collectors, receivers
 
     def connect(self):
         raise NotImplemented
@@ -103,16 +160,21 @@ class TaskEventBackend:
         event = ContextDict.drop()
         self.logger.info("task", extra={"event":event}) # Improve: better log logic
 
+    @staticmethod
+    def drop_context_to_request_event(*args, **kwargs):
+        event = ContextDict.drop()
+        EventBlock.set(*event)
+
 
     def run_collector_hooks(self, hook_str, *args, **kwargs):
         _collectors = self.collectors.get(hook_str, [])
-
-        for col in _collectors:
+        for col_index in _collectors:
             try:
-                col(*args, **kwargs)
+                col = self._collector_classes[col_index]
+                getattr(col, hook_str)(*args, **kwargs)
             except Exception as e:
-                # save as an error
-                ...
-        pass
+                TaskHookErrorEvent.save_hook_error(
+                    hook_str,  "".join(traceback.format_exception(type(e), e, e.__traceback__)),
+                )
 
 
