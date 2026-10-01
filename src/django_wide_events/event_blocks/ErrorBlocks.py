@@ -19,6 +19,7 @@ class ExceptionEvent(EventBlock):
 class HookErrorEvent(EventBlock):
 
     namespace = "hook_error"
+    use_namespace_on_write = False
     append_list = True
 
     @classmethod
