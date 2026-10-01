@@ -46,7 +46,7 @@ WIDE_EVENTS = {
     "LOGGER_NAME": "wide_events.request",
     # only connects when a test installs the tasks app; set here rather than next to that
     # override because override_settings runs ready() before other overrides apply
-    "TASK_BACKENDS": ["django_tasks"],
+    "TASK": {"BACKENDS": ["django_tasks"]},
     "REQUEST_ID": {
         "TRUST_ID_HEADER": True,
         "RESPONSE_HEADER": "X-Request-Id",

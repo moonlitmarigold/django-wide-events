@@ -4,8 +4,8 @@ from django.core.signals import setting_changed
 from .collectors import DEFAULT_COLLECTORS
 from .tasks.collectors import DEFAULT_TASK_COLLECTORS
 
-IMPORT_STRINGS = {"COLLECTORS", "ID_GENERATOR", "SESSION_ID_GENERATOR", "SESSION_CHECKS"}          # values are dotted paths -> import them
-NESTED = {"STATIC_FIELDS", "REQUEST_ID", "SESSION_TRACE"}   # merge one level deep instead of replacing
+IMPORT_STRINGS = {"COLLECTORS", "ID_GENERATOR", "SESSION_ID_GENERATOR", "SESSION_CHECKS", "TASK_COLLECTORS"}          # values are dotted paths -> import them
+NESTED = {"STATIC_FIELDS", "REQUEST_ID", "SESSION_TRACE", "TASK"}   # merge one level deep instead of replacing
 
 DEFAULTS = {
     "COLLECTORS": DEFAULT_COLLECTORS,
