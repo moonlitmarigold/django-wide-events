@@ -26,14 +26,23 @@ class ChangeHookPositionClass:
     collectors: list[CollectorEntry]
     hooks: dict[str, list[int]]
     changes: tuple[Change, ...]
+    default_class_check_function:Callable | None = None
 
-    @staticmethod
-    def get_index_class_in_collectors(_cls, collectors):
+    def __post_init__(self):
+
+        self.check_function = self.default_check_function if not self.default_class_check_function else self.default_class_check_function
+
+
+    def get_index_class_in_collectors(self, _cls, collectors):
         for i, hook in enumerate(collectors):
             # entries are classes or factory instances; only classes can match
-            if isinstance(hook, type) and issubclass(hook, _cls):
+            if self.check_function(_cls, hook):
                 return i
         return None
+
+    @staticmethod
+    def default_check_function(_cls, hook):
+        return isinstance(hook, type) and issubclass(hook, _cls)
 
     def change_position_of_hook(self, _change: Change, collector_index) -> list[int]:
         hook_phase = self.hooks[_change.phase]
@@ -65,10 +74,11 @@ class HookPosition:
 
     cls:type[Collector]
     changes: tuple[Change, ...]
+    default_class_check_function:Callable | None = None
 
     def apply(
         self,
         collectors: list[CollectorEntry],
         hooks: dict[str, list[int]],
     ) -> None:
-        ChangeHookPositionClass(self.cls, collectors, hooks, self.changes).convert()
+        ChangeHookPositionClass(self.cls, collectors, hooks, self.changes, self.default_class_check_function).convert()
