@@ -23,7 +23,7 @@ DEFAULTS = {
         "NO_TRACE_VIEW_NAMES": [],           # URL names, checked in process_view
         "ONLY_EXISTING_SESSIONS": True,        # don't create sessions for bots
         "SESSION_ID_GENERATOR": "django_wide_events.ids.uuid4_hex",
-        "SESSION_CHECKS":[],
+        "SESSION_CHECKS": [],
         "NO_TRACE_USER_AGENTS": [              # case-insensitive substrings of the User-Agent
             "bot", "crawler", "spider", "kube-probe", "ELB-HealthChecker", "GoogleHC",
         ],
