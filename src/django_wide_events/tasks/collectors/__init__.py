@@ -5,3 +5,6 @@ DEFAULT_TASK_COLLECTORS = [
     "django_wide_events.tasks.collectors.defaults.Attempt",
     "django_wide_events.tasks.collectors.defaults.EnqueuedInCaller",
 ]
+
+
+from .Base import TaskCollector

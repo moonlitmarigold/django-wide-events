@@ -1,6 +1,4 @@
-from ipaddress import ip_network
-
-from .context import TaskContext, TaskTokenContext, TaskState
+from .context import TaskContext, TaskTokenContext, TaskState, ContextEvent
 import logging
 from ..config import wide_event_settings
 from typing import ClassVar
@@ -52,35 +50,40 @@ class SignalCallable:
     _func:Callable
     _adapter:Callable|None
 
-    def __post_init__(self):
+    __func = None
+
+    def init__func(self):
         if self._adapter:
             self.__func = lambda *args, **kwargs: self._func(self._adapter(*args, **kwargs))
         else:
             self.__func = lambda *args, **kwargs: self._func(*args, **kwargs)
 
     def __call__(self, *args, **kwargs):
+        if not self.__func:
+            self.init__func()
         return self.__func(*args, **kwargs)
 
 @dataclass
-class MaskCollector:
-
-    _start_func:Callable
-    _finish_func:Callable
-
-
-    def on_start(self, *args, **kwargs):
-        self._start_func()
-
-    def on_finish(self, *args, **kwargs):
-        self._finish_func()
-
-@dataclass
-class MaskEnqueueCollector:
+class SimpleMaskCollector:
 
     _func:Callable
+    key:str | list[str]
+    name:str
 
-    def on_enqueue(self, *args, **kwargs):
-        self._func()
+    def __post_init__(self):
+        if isinstance(self.key, str):
+            self.key = [self.key]
+
+    def __getattr__(self, item):
+        if item in self.key:
+            return self._func
+        raise AttributeError()
+
+    @staticmethod
+    def override_check_function(_cls, hook):
+        if not hasattr(hook, "name"):
+            return False
+        return _cls == hook.name and isinstance(hook, SimpleMaskCollector)
 
 class TaskEventBackend:
 
@@ -93,7 +96,25 @@ class TaskEventBackend:
     #       str[Hook], lambda: adapter
     HookPositionChanges:ClassVar[tuple[HookPosition, ...] ] = ()
     builtin_HookPositionChanges = (
-
+        HookPosition(
+            "init", (
+                Change(TaskPhase.on_enqueued, 0),
+                Change(TaskPhase.on_start, 0)
+            ),
+            default_class_check_function=SimpleMaskCollector.override_check_function
+        ),
+        HookPosition(
+            "finish", (
+                Change(TaskPhase.on_finish, -1),
+            ),
+            default_class_check_function=SimpleMaskCollector.override_check_function
+        ),
+        HookPosition(
+            "enqueued", (
+                Change(TaskPhase.on_enqueued, -1),
+            ),
+            default_class_check_function=SimpleMaskCollector.override_check_function
+        )
     )
 
 
@@ -107,6 +128,13 @@ class TaskEventBackend:
         self._collector_classes = [*BUILTIN_TASK_COLLECTORS, *_task_settings.get("TASK_COLLECTORS")]
 
         self._collector_classes = [c() for c in self._collector_classes]
+
+        # Add builtin Context Managing
+        self._collector_classes.extend([
+            SimpleMaskCollector(self.init_ctx, [TaskPhase.on_start, TaskPhase.on_enqueued], name="init"),
+            SimpleMaskCollector(self.finish, TaskPhase.on_finish, name="finish"),
+            SimpleMaskCollector(self.enqueue_end, TaskPhase.on_enqueued, name="enqueued")
+        ])
 
         self.collectors, self.receivers = self.return_collectors()
         # Shape:
@@ -124,28 +152,13 @@ class TaskEventBackend:
                 if x is not None
             ]
 
-            receivers[hook_str] = SignalCallable(
+            receivers[native_signal] = SignalCallable(
                 functools.partial(self.run_collector_hooks, hook_str),
                 _adapter
             )
 
         for change in [*self.HookPositionChanges, *self.builtin_HookPositionChanges]:
             change.apply(self._collector_classes, output_collectors)
-
-        # Add the start and finish
-        mask_collector = MaskCollector(self.init_ctx, self.finish)
-        self._collector_classes.append(mask_collector)
-        index = len(self._collector_classes) - 1
-
-        output_collectors[TaskPhase.on_start] = [index, *output_collectors[TaskPhase.on_start]]
-        output_collectors[TaskPhase.on_finish] = [*output_collectors[TaskPhase.on_finish], index]
-
-        # Add write to the request context
-        self._collector_classes.extend(
-            [MaskEnqueueCollector(self.init_ctx), MaskEnqueueCollector(self.drop_context_to_request_event)]
-        )
-
-        output_collectors[TaskPhase.on_enqueued] = [index+1, *output_collectors[TaskPhase.on_enqueued], index+2]
 
         return output_collectors, receivers
 
@@ -156,14 +169,28 @@ class TaskEventBackend:
     def init_ctx(*args, **kwargs):
         ContextDict.init()
 
+    @staticmethod
+    def _log(event:dict):
+        if "task" not in event:
+            return True
+        _task = event.get("task", {})
+        return "status" not in _task or _task.get("status") == "failed"
+
     def finish(self, *args, **kwargs):
         event = ContextDict.drop()
-        self.logger.info("task", extra={"event":event}) # Improve: better log logic
+
+        if self._log(event):
+            self.logger.error("task", extra={"event":event})
+        else:
+            self.logger.info("task", extra={"event":event})
 
     @staticmethod
-    def drop_context_to_request_event(*args, **kwargs):
-        event = ContextDict.drop()
-        EventBlock.set(*event)
+    def enqueue_end(*args, **kwargs):
+        event = ContextDict.drop().get("task", None)
+        if not event:
+            return
+        caller = TaskContext if TaskContext._contex_var.get() is not None else ContextEvent
+        caller.update({"tasks": [event]}, append_lists=True, drop_none=True)
 
 
     def run_collector_hooks(self, hook_str, *args, **kwargs):
@@ -176,5 +203,6 @@ class TaskEventBackend:
                 TaskHookErrorEvent.save_hook_error(
                     hook_str,  "".join(traceback.format_exception(type(e), e, e.__traceback__)),
                 )
+
 
 

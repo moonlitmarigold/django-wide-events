@@ -14,8 +14,7 @@ class TaskIdentity(TaskCollector):
 
     def on_start(self, info):
         self.set(
-            source="task",
-            task={
+            **{
                 "id": info.task_id,
                 "name": info.name,
                 "framework": info.framework,
@@ -47,7 +46,7 @@ class Timing(TaskCollector):
 class Status(TaskCollector):
 
     def on_finish(self, info):
-        self.set(task={"status": info.status})
+        self.set(**{"status": info.status})
 
 
 @builtin_task_collector

@@ -5,9 +5,11 @@ rather than inside the test module."""
 
 from django.tasks import task
 from django_wide_events.event_blocks import EventBlock
+from django_wide_events.tasks.collectors import TaskCollector
+from django_wide_events.tasks.events import TaskEventBlock
 
 
-class InvoiceBlock(EventBlock):
+class InvoiceBlock(TaskEventBlock):
 
     namespace = "invoice"
 
